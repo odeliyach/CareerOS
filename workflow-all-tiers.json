@@ -1,0 +1,49 @@
+{
+  "nodes": [
+    {
+      "name": "Tier 1 - Core Application",
+      "type": "function",
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "functionCode": "\nconst escapeString = (str) => {
+  return str.replace(/\\/g, '\\\\')  // Escape backslashes
+              .replace(/\"/g, '\\\"')  // Escape double quotes
+              .replace(/\n/g, '\\n')      // Escape newlines
+              .replace(/\r/g, '\\r');    // Escape carriage returns
+};\n\nconst metadataContent = escapeString(items[0].json.metadataContent);\nconst resumeContent = escapeString(items[0].json.resumeContent);\nconst coverLetterContent = escapeString(items[0].json.coverLetterContent);\n\nreturn {\n  "metadataContent": metadataContent,\n  "resumeContent": resumeContent,\n  "coverLetterContent": coverLetterContent\n};\n\n}",
+        "options": {
+          "outcome": "success"
+        }
+      },
+      "credentials": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "ATS Keyword Optimization",
+      "type": "n8n-nodes-base.atsKeywordOptimization",
+      "position": [
+        250,
+        400
+      ],
+      "parameters": {},
+      "typeVersion": 1,
+      "credentials": {} 
+    }
+  ],
+  "connections": {
+    "Tier 1 - Core Application": {
+      "main": [
+        [
+          {
+            "node": "ATS Keyword Optimization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
