@@ -14,63 +14,51 @@ Generates tailored resumes, cover letters, cold emails, interview prep, and port
 Job URL / Description
         │
         ▼
-┌───────────────────────────────────────────────────────────┐
-│                N8N Workflow (14 nodes)                     │
-│                                                           │
-│  [Trigger] → [Set Details] → [Parse Job Info]             │
-│                                    │                      │
-│                                    ▼                      │
-│                         [ATS Keyword Optimization]        │
-│                    ┌────────────┼──────────────┐          │
-│                    ▼            ▼               ▼          │
-│              [Tier 1]      [Tier 2]        [Tier 3]        │
-│              [Tier 4]      [Tier 5]  ← All run in PARALLEL │
-│                    └────────────┼──────────────┘          │
-│                                 ▼                         │
-│                         [Merge Results]                   │
-│                                 ▼                         │
-│                  [Git Commit → Obsidian Vault]            │
-│                                 ▼                         │
-│                [Notify: Email Ready for Approval]         │
-│                                 ▼                         │
-│                  [Manual Approval ← User Reviews]         │
-│                                 ▼                         │
-│                      [Send Email Notification]            │
-└───────────────────────────────────────────────────────────┘
-        │
-        ▼ GitHub Sync
-odeliyach/job-search-data/Obsidian_Vault/
-        │
-        ▼ Obsidian Git plugin (auto-pull every 10 min)
-C:\Users\odali\Obsidian\Job_Search_Test\
+┌───────────────────────────────────────────────────────┐
+│                 N8N Workflow (10 nodes)                │
+│                                                       │
+│  [Trigger] → [Set Details] → [Parse Job Info]         │
+│       │                                               │
+│       ▼                                               │
+│  [Tier 1] Resume + Cover Letter + Metadata            │
+│       │  ↳ Ollama: llama3.2  ↳ files: 3 .md          │
+│       ▼                                               │
+│  [Tier 2] Cold Emails + Company Research              │
+│       │  ↳ Ollama: llama3.2  ↳ files: 3 .md          │
+│       ▼                                               │
+│  [Tier 3] Interview Prep + Salary Guide               │
+│       │  ↳ Ollama: llama3.2  ↳ files: 1 .md          │
+│       ▼                                               │
+│  [Tier 4] Portfolio Matching + GitHub Strategy        │
+│       │  ↳ Ollama: llama3.2  ↳ files: 1 .md          │
+│       ▼                                               │
+│  [Tier 5] SQLite DB + Tracking + Analytics            │
+│       │  ↳ sqlite3  ↳ files: 2 .md                   │
+│       ▼                                               │
+│  [Git Commit] → job-search-data (PRIVATE)             │
+│       ▼                                               │
+│  [Email Notification] → Gmail                         │
+└───────────────────────────────────────────────────────┘
 ```
 
-### Obsidian Vault Structure (synced via GitHub)
+### Vault Structure (private repo)
 
 ```
-odeliyach/job-search-data/Obsidian_Vault/
-├── Dashboard/
-│   └── 01_Main_Dashboard.md        ← auto-updated
-├── Job_Applications/
-│   ├── Active/                     ← status: applied
-│   ├── Waiting/                    ← status: phone_screen / technical
-│   ├── Offers/                     ← status: offer_received
-│   └── Rejected/                   ← status: rejected
-├── My_Materials/
-│   ├── Resume_Versions/            ← one file per company
-│   └── Portfolio_Projects/
-├── Interview_Prep/
-│   └── Company_Specific/           ← one file per company
-├── Resources/
-└── Templates/
+/home/n8n/.n8n/vault/
+├── 2026/
+│   └── 03/
+│       └── 19_Google_SoftwareEngineer/
+│           ├── metadata.md
+│           ├── resume.md
+│           ├── cover_letter.md
+│           ├── cold_email.md
+│           ├── company_research.md
+│           ├── personal_angle.md
+│           ├── interview_prep.md
+│           ├── portfolio_matching.md
+│           └── tracking.md
+└── analytics.md
 ```
-
-Each `Job_Applications/[Status]/[company].md` file includes:
-- Frontmatter (company, role, dates, status, salary, etc.)
-- Job Requirements vs My Skills
-- Generated Materials (resume, cover letter, cold email, interview prep, portfolio)
-- Communication Log (all interactions with timestamps)
-- Follow-up Schedule (Day 3, Day 7, Post-Phone, Post-Technical)
 
 ---
 
@@ -78,18 +66,9 @@ Each `Job_Applications/[Status]/[company].md` file includes:
 
 | File | Description |
 |---|---|
-| `n8n-workflows/workflow-all-tiers.json` | Main N8N workflow — all 5 tiers in parallel + Obsidian sync |
-| `n8n-workflows/workflow-email-listener.json` | Email listener — monitors Gmail, classifies emails, generates rejection responses |
-| `n8n-workflows/workflow-followup-scheduler.json` | Daily follow-up scheduler — Day 3, Day 7, post-interviews, 90-day check-in |
+| `workflow-all-tiers.json` | Complete N8N workflow — import directly into N8N UI |
 | `init_database.sql` | SQLite schema initialization script |
 | `PROMPTS.md` | All Ollama prompt templates with variable reference |
-| `prompts/tier-1-resume.md` | Senior Architect resume analysis prompt |
-| `prompts/tier-1-cover-letter.md` | Cover letter generation prompt |
-| `prompts/tier-2-cold-email.md` | Cold outreach email prompt |
-| `prompts/tier-3-interview-questions.md` | Interview prep prompt |
-| `prompts/tier-4-portfolio.md` | Portfolio matching prompt |
-| `prompts/follow-up-email-template.md` | Follow-up email templates (Day 3, 7, post-screen, post-technical, 90-day) |
-| `prompts/rejection-response-template.md` | Context-aware rejection response templates |
 | `database_schema.md` | Database table documentation and query examples |
 | `docker-compose.yml` | Local development Docker Compose |
 | `Dockerfile` | N8N Docker image (root-level for Render compatibility) |
@@ -160,15 +139,13 @@ docker exec ollama ollama pull llama3.2
 
 ---
 
-### Step 5: Import Workflows into N8N
+### Step 5: Import Workflow into N8N
 
 1. Open N8N at `http://localhost:5678` (or your Render URL)
 2. Log in with your Basic Auth credentials
-3. Import all 3 workflows:
-   - Click **+** → **Import from file** → Upload `n8n-workflows/workflow-all-tiers.json`
-   - Click **+** → **Import from file** → Upload `n8n-workflows/workflow-email-listener.json`
-   - Click **+** → **Import from file** → Upload `n8n-workflows/workflow-followup-scheduler.json`
-4. Click **Save** for each
+3. Click **+** → **Import from file**
+4. Upload `workflow-all-tiers.json`
+5. Click **Save**
 
 ---
 
@@ -202,22 +179,6 @@ Or in Render.com: **Environment** → **Add Environment Variable** → `GITHUB_T
 1. Create a **private** GitHub repository named `job-search-data`
 2. Initialize with a README
 3. The workflow will automatically commit job application files there
-
----
-
-### Step 8: Set Up Obsidian Sync (Obsidian Git Plugin)
-
-1. Open Obsidian → **Settings** → **Community Plugins**
-2. Search: **"Obsidian Git"**
-3. Install and enable the plugin
-4. Configure the plugin:
-   - **Remote URL:** `https://github.com/odeliyach/job-search-data.git`
-   - **Auto pull interval:** `10` (minutes)
-   - **Vault location:** `Obsidian_Vault` subfolder
-5. Click **"Pull from remote"** for the first sync
-6. Files will now appear in `C:\Users\odali\Obsidian\Job_Search_Test` automatically
-
-> **Sync Flow:** N8N (Render) → Commits to GitHub → Obsidian Git pulls every 10 min → Files appear in your local vault
 
 ---
 
@@ -257,34 +218,16 @@ See `config/render.yaml` for the full Render configuration.
 
 ## Workflow Tiers
 
-All 5 tiers execute in **parallel** after the ATS Keyword Optimization node.
-
 | Tier | Node Name | Ollama Calls | Output Files |
 |---|---|---|---|
-| 0 | ATS Keyword Optimization | 0 | Keyword analysis (in-memory) |
 | 1 | Core Application | 2 | `metadata.md`, `resume.md`, `cover_letter.md` |
 | 2 | Cold Outreach | 4 | `cold_email.md`, `company_research.md`, `personal_angle.md` |
 | 3 | Interview Prep | 4 | `interview_prep.md` |
-| 4 | Portfolio Matching | 4 + GitHub API | `portfolio_matching.md` (real GitHub projects) |
+| 4 | Portfolio Matching | 4 | `portfolio_matching.md` |
 | 5 | Database & Tracking | 0 (SQLite) | `tracking.md`, `analytics.md` |
 
 All Ollama calls go to `http://ollama:11434/api/generate` with model `llama3.2`.  
-See [PROMPTS.md](PROMPTS.md) and the `prompts/` folder for all prompt templates.
-
-### Additional Workflows
-
-| Workflow | Trigger | Purpose |
-|---|---|---|
-| `workflow-email-listener.json` | Every 30 minutes | Monitors Gmail, classifies job emails, generates rejection responses (with approval) |
-| `workflow-followup-scheduler.json` | Daily at 9 AM | Checks for due follow-ups (Day 3, Day 7, post-interviews, 90-day) — all require manual approval |
-
-### Email Safety
-
-**Zero emails are sent without manual user approval.** The flow is:
-1. N8N generates email draft
-2. N8N sends you a notification email with preview
-3. You review in N8N and click **Resume** to approve
-4. Only then is the email sent
+See [PROMPTS.md](PROMPTS.md) for all prompt templates.
 
 ---
 
