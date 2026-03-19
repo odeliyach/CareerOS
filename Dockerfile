@@ -1,23 +1,21 @@
-# Use an official Node.js runtime as a parent image
-FROM node:14
+# Dockerfile for N8N on Render
 
-# Set the working directory
-WORKDIR /usr/src/app
+# Use the official N8N base image
+FROM n8nio/n8n:latest
 
-# Install app dependencies by copying package.json and package-lock.json
-COPY package*.json ./
+# Configure for Render environment
+ENV NODE_ENV=production
+ENV N8N_PORT=5678
 
-# Install production dependencies
-RUN npm install --only=production
+# Database type - credentials via environment variables
+ENV DB_TYPE=postgres
 
-# Bundle app source
-COPY . .
-
-# Install curl
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-# Expose port
+# Expose port 5678 for N8N
 EXPOSE 5678
 
-# Run the application
-CMD [ "node", "app.js" ]
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:5678/ || exit 1
+
+# Start N8N
+CMD ["n8n"]
