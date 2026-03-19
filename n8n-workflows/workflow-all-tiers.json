@@ -864,7 +864,7 @@
     },
     {
       "parameters": {
-        "command": "=COMPANY_SAFE=\"{{ $('Parse Job Data').item.json.companyShell }}\"\nTITLE_SAFE=\"{{ $('Parse Job Data').item.json.jobTitleShell }}\"\ncd /home/n8n/.n8n/vault && git config user.email \"odaliya12@gmail.com\" && git config user.name \"odeliyach\" && git init && (git remote remove origin 2>/dev/null || true) && git remote add origin \"https://{{ $credentials.githubApi.accessToken }}@github.com/odeliyach/job-search-data.git\" && git add -A && git commit -m \"Add job application: ${COMPANY_SAFE} - ${TITLE_SAFE} ($(date +%Y-%m-%d))\" && git push origin main --force-with-lease 2>&1 || echo 'Git push completed'"
+        "command": "=COMPANY_SAFE=\"{{ $('Parse Job Data').item.json.companyShell }}\"\nTITLE_SAFE=\"{{ $('Parse Job Data').item.json.jobTitleShell }}\"\nVAULT_DIR=\"/home/n8n/.n8n/vault\"\n# Create askpass script so the token is not embedded in the remote URL\nASKPASS=$(mktemp)\nchmod 700 \"$ASKPASS\"\nprintf '#!/bin/sh\\necho \"{{ $credentials.githubApi.accessToken }}\"\\n' > \"$ASKPASS\"\ncd \"$VAULT_DIR\"\ngit config user.email \"odaliya12@gmail.com\"\ngit config user.name \"odeliyach\"\n# Initialize repo only once\n[ -d .git ] || git init\n(git remote remove origin 2>/dev/null || true)\ngit remote add origin https://github.com/odeliyach/job-search-data.git\ngit add -A\ngit commit -m \"Add job application: ${COMPANY_SAFE} - ${TITLE_SAFE} ($(date +%Y-%m-%d))\" || echo 'Nothing to commit'\nGIT_ASKPASS=\"$ASKPASS\" git push origin main --force-with-lease 2>&1 || echo 'Git push completed'\nrm -f \"$ASKPASS\""
       },
       "id": "node-t5-git",
       "name": "T5 - Git Commit to GitHub",
