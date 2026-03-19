@@ -108,7 +108,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const jobData = $input.item.json;\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false },\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return '[Ollama Error: ' + e.message + ']';\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst resumePrompt = 'You are a Senior Software Architect and Technical Hiring Manager with 15+ years in the Israeli high-tech industry (Google, Palo Alto Networks, Wix, SailPoint, and high-growth unicorns). You have zero tolerance for messy code and student-style habits. You are brutally honest but constructive.\\n\\n' +\n'TRANSFORM THIS RESUME INTO PRODUCTION-GRADE PORTFOLIO:\\n\\n' +\n'1. The \"Why\" Analysis: For each project/skill, explain professional reasoning:\\n' +\n'   - Why this specific architecture/language/library?\\n' +\n'   - What business problem did it solve?\\n' +\n'   - What trade-offs were considered?\\n' +\n'   - What would you do differently now?\\n\\n' +\n'2. The \"Brutal\" Truth: First impression assessment:\\n' +\n'   - Does this look like \"generic student\" or \"high-potential engineer\"?\\n' +\n'   - Be direct, professional, witty - like a mentor who won\\'t sugarcoat\\n' +\n'   - Specific feedback on what screams \"junior\" vs. \"senior\"\\n' +\n'   - What immediately stands out (good or bad)?\\n\\n' +\n'3. Identify & Remove Fluff:\\n' +\n'   - What sections/achievements don\\'t belong on a Senior resume?\\n' +\n'   - What\\'s weak or generic that should be removed?\\n' +\n'   - What should stay because it\\'s truly impressive?\\n' +\n'   - What\\'s missing?\\n\\n' +\n'4. Tech Stack Reframing (Student -> Senior):\\n' +\n'   - Instead of: \"Built a todo app with React\"\\n' +\n'   - Reframe as: \"Architected real-time collaborative task management system with optimistic updates, Redux state management, TypeScript strict mode, custom hooks for reusable state logic\"\\n' +\n'   - For EACH project: provide \"before/after\" reframing\\n' +\n'   - Use metrics, business impact, architectural decisions\\n\\n' +\n'5. ATS & AI Scanner Optimization - CRITICAL:\\n' +\n'   - This CV will be scanned by automated AI systems used by Israeli tech companies\\n' +\n'   - Flag EVERY missing keyword critical for market:\\n' +\n'     * Cloud: AWS (EC2, S3, Lambda, RDS, VPC), GCP (Compute Engine, Cloud Run, Firestore), Azure\\n' +\n'     * Containerization: Docker, Kubernetes (K8s), Helm, container orchestration\\n' +\n'     * CI/CD: GitHub Actions, GitLab CI, Jenkins, CircleCI, deployment pipelines\\n' +\n'     * Architecture: Microservices, distributed systems, scalability patterns, system design\\n' +\n'     * Databases: SQL optimization, query performance, NoSQL, caching (Redis), database design\\n' +\n'     * Testing: Unit tests (Jest, Vitest), Integration tests, E2E tests (Cypress, Playwright), test coverage\\n' +\n'     * Code quality: TypeScript, ESLint, SOLID principles, design patterns, refactoring\\n' +\n'     * Monitoring: Logging (ELK stack, Datadog), performance monitoring, observability, APM\\n' +\n'     * DevOps: Infrastructure as Code (Terraform), monitoring, CI/CD, deployment\\n' +\n'   - For EACH missing keyword: suggest where/how to add naturally without sounding forced\\n\\n' +\n'6. Gap Identification - Israeli Market 2026:\\n' +\n'   - What critical skills/technologies are missing?\\n' +\n'   - Which gaps are \"must-have\" (without these, not competitive) vs \"nice-to-have\"?\\n' +\n'   - Priority ranking: What makes the BIGGEST difference?\\n' +\n'   - What would move from \"good candidate\" to \"strong hire\"?\\n\\n' +\n'7. Production-Grade Signals:\\n' +\n'   - Evidence of: scaling systems (user count, data volume, requests/sec)?\\n' +\n'   - Production debugging and troubleshooting?\\n' +\n'   - Leadership/mentoring experience?\\n' +\n'   - Documentation and knowledge sharing?\\n' +\n'   - Open source contributions?\\n' +\n'   - Performance optimization?\\n' +\n'   - Security awareness?\\n' +\n'   - Incident response experience?\\n\\n' +\n'OUTPUT FORMAT:\\n' +\n'- Section-by-section analysis with specific recommendations\\n' +\n'- \"Before/After\" examples for reframing\\n' +\n'- Numbered priority list of improvements (most impactful first)\\n' +\n'- Estimated impact of each change on marketability (High/Medium/Low)\\n\\n' +\n'User Skills: ' + jobData.user_skills + '\\n' +\n'Current Projects: ' + jobData.tech_stack + '\\n' +\n'Target Role: ' + jobData.job_title + ' at ' + jobData.company_name + '\\n' +\n'Job Requirements: ' + jobData.job_requirements;\n\nconst coverLetterPrompt = 'Write a compelling cover letter for ' + jobData.company_name + ' ' + jobData.job_title + ' position. Show genuine interest in the company and role. Be personal, specific, and professional. Keep to 3-4 paragraphs. Explain why you\\'re interested in this specific company and role, not generic application letter.';\n\nconst resume = await callOllama(resumePrompt);\nconst coverLetter = await callOllama(coverLetterPrompt);\n\nconst metadataContent = '# Application: ' + jobData.company_name + ' - ' + jobData.job_title + '\\n\\n- Company: ' + jobData.company_name + '\\n- Title: ' + jobData.job_title + '\\n- Location: ' + jobData.location + '\\n- URL: ' + jobData.job_url + '\\n- Applied: ' + jobData.applied_date + '\\n- Application ID: ' + jobData.application_id + '\\n\\n## Job Description\\n' + jobData.job_description + '\\n\\n## Requirements\\n' + jobData.job_requirements + '\\n';\n\nconst resumeContent = '# Resume - ' + jobData.job_title + ' at ' + jobData.company_name + '\\n\\n' + resume;\nconst coverLetterContent = '# Cover Letter - ' + jobData.company_name + '\\n\\n' + coverLetter;\n\nreturn [{\n  json: {\n    ...jobData,\n    tier1_status: 'complete',\n    resume_preview: resume.substring(0, 300),\n    metadata_content: metadataContent,\n    resume_content: resumeContent,\n    cover_letter_content: coverLetterContent\n  }\n}];"
+        "jsCode": "const jobData = $input.item.json;\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false },\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return `[Ollama Error: ${e.message}]`;\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst resumePrompt = `Generate a tailored resume for ${jobData.company_name} ${jobData.job_title} position. Job requirements: ${jobData.job_requirements}. User skills: ${jobData.user_skills}. Match skills exactly to requirements. Use metrics and STAR method. Format as professional resume with sections: Summary, Experience, Skills, Education. Be specific and quantifiable.`;\n\nconst coverLetterPrompt = `Write a compelling cover letter for ${jobData.company_name} ${jobData.job_title} position. Show genuine interest in the company and role. Be personal, specific, and professional. Keep to 3-4 paragraphs. Explain why you're interested in this specific company and role, not generic application letter.`;\n\nconst resume = await callOllama(resumePrompt);\nconst coverLetter = await callOllama(coverLetterPrompt);\n\nconst metadataContent = `# Application: ${jobData.company_name} - ${jobData.job_title}\\n\\n- Company: ${jobData.company_name}\\n- Title: ${jobData.job_title}\\n- Location: ${jobData.location}\\n- URL: ${jobData.job_url}\\n- Applied: ${jobData.applied_date}\\n- Application ID: ${jobData.application_id}\\n\\n## Job Description\\n${jobData.job_description}\\n\\n## Requirements\\n${jobData.job_requirements}\\n`;\n\nconst resumeContent = `# Resume - ${jobData.job_title} at ${jobData.company_name}\\n\\n${resume}`;\nconst coverLetterContent = `# Cover Letter - ${jobData.company_name}\\n\\n${coverLetter}`;\n\nreturn [{\n  json: {\n    ...jobData,\n    tier1_status: 'complete',\n    resume_preview: resume.substring(0, 300),\n    metadata_content: metadataContent,\n    resume_content: resumeContent,\n    cover_letter_content: coverLetterContent\n  }\n}];"
       }
     },
     {
@@ -150,7 +150,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const jobData = $input.item.json;\nconst githubToken = process.env.GITHUB_TOKEN || '';\n\nasync function fetchGitHubRepos() {\n  try {\n    const resp = await $helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/users/odeliyach/repos?sort=stars&per_page=50',\n      headers: {\n        'Authorization': githubToken ? ('token ' + githubToken) : '',\n        'Accept': 'application/vnd.github.v3+json'\n      }\n    });\n    return resp;\n  } catch(e) {\n    console.error('GitHub API error:', e.message);\n    return [];\n  }\n}\n\nfunction rankProjectsByRelevance(repos, jobDescription) {\n  return repos.map(repo => {\n    const relevanceScore = calculateRelevance(\n      (repo.description || '') + ' ' + (repo.topics || []).join(' '),\n      jobDescription\n    );\n    return {\n      name: repo.name,\n      description: repo.description,\n      stars: repo.stargazers_count,\n      language: repo.language,\n      url: repo.html_url,\n      relevanceScore: relevanceScore\n    };\n  })\n  .sort((a, b) => b.relevanceScore - a.relevanceScore)\n  .slice(0, 5);\n}\n\nfunction calculateRelevance(repoText, jobDescription) {\n  const jobKeywords = jobDescription.toLowerCase().split(/\\s+/);\n  const repoText_lower = repoText.toLowerCase();\n  let score = 0;\n  jobKeywords.forEach(keyword => {\n    if (repoText_lower.includes(keyword)) score += 1;\n  });\n  return score;\n}\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false }\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return '[Ollama Error: ' + e.message + ']';\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst allRepos = await fetchGitHubRepos();\nconst topProjects = rankProjectsByRelevance(allRepos, jobData.job_description);\n\nconst projectSelectionPrompt = 'Based on these actual GitHub projects from odeliyach: ' + JSON.stringify(topProjects.map(p => ({name: p.name, description: p.description, stars: p.stars, language: p.language}))) + '\\n\\nFor the job title \"' + jobData.job_title + '\" at \"' + jobData.company_name + '\", explain why each of these 5 projects is relevant to the job requirements. Be specific about technical skills demonstrated and why each project would impress this company.';\n\nconst metricsPrompt = 'For each of these projects: ' + topProjects.map(p => p.name).join(', ') + '. Create realistic quantifiable metrics showing impact: users affected, performance improvements, code quality indicators, adoption metrics. Make them specific and believable.';\n\nconst atsPrompt = 'Review this job description for critical keywords the resume must include: ' + jobData.job_description + '. List ALL required: technologies, frameworks, methodologies, tools, soft skills, certifications. Be comprehensive.';\n\nconst projectSelection = await callOllama(projectSelectionPrompt);\nconst metrics = await callOllama(metricsPrompt);\nconst atsKeywords = await callOllama(atsPrompt);\n\nlet projectsList = '';\ntopProjects.forEach(p => {\n  projectsList += '- **' + p.name + '** (' + p.stars + ' stars | ' + (p.language || 'Multiple') + ') - ' + (p.description || 'Project') + '\\n  Link: ' + p.url + '\\n';\n});\n\nconst portfolioContent = '# Portfolio Matching - ' + jobData.company_name + ' - ' + jobData.job_title + '\\n\\n' +\n  '## Real GitHub Projects (Top 5 by Relevance)\\n' +\n  projectSelection + '\\n\\n' +\n  '## Demonstrated Metrics & Impact\\n' +\n  metrics + '\\n\\n' +\n  '## ATS Optimization Keywords\\n' +\n  atsKeywords + '\\n\\n' +\n  '## Your Top Projects to Showcase\\n' +\n  projectsList + '\\n' +\n  '## Strategy\\n' +\n  'These projects demonstrate: scalability, production-grade code, real-world impact, and direct alignment with ' + jobData.job_title + ' requirements.';\n\nreturn [{\n  json: {\n    ...jobData,\n    tier4_status: 'complete',\n    portfolio_content: portfolioContent,\n    real_github_projects: topProjects,\n    github_api_success: true\n  }\n}];"
+        "jsCode": "const jobData = $input.item.json;\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false },\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return `[Ollama Error: ${e.message}]`;\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst projectSelectionPrompt = `From user's GitHub (username: odeliyach), identify and select the 5 projects most relevant to ${jobData.job_description} for ${jobData.job_title}. Explain why each project is relevant. Consider: technical skills match, complexity, business impact, recency, documentation quality.`;\n\nconst metricsPrompt = `For the selected projects, create quantifiable metrics showing impact. For each project include: performance improvements (%, ms, throughput), user growth metrics, cost savings, engagement metrics, scalability metrics, code quality metrics. Use specific numbers and percentages.`;\n\nconst projectContextPrompt = `For each selected project provide: original objectives/problem solved, technical challenges faced, your specific role and responsibilities, technologies/tools used, impact achieved, lessons learned. Be detailed and business-focused.`;\n\nconst githubStrategyPrompt = `Provide strategies to improve GitHub visibility for these projects to attract ${jobData.company_name} attention. Include: README improvements, demo links/videos, contribution stats highlighting, deployment links, relevant badges, documentation enhancement, community engagement, GitHub profile optimization.`;\n\nconst projectSelection = await callOllama(projectSelectionPrompt);\nconst metrics = await callOllama(metricsPrompt);\nconst projectContext = await callOllama(projectContextPrompt);\nconst githubStrategy = await callOllama(githubStrategyPrompt);\n\nconst portfolioContent = `# Portfolio Matching - ${jobData.company_name} - ${jobData.job_title}\\n\\n## Project Selection\\n\\n${projectSelection}\\n\\n---\\n\\n## Project Metrics\\n\\n${metrics}\\n\\n---\\n\\n## Project Context\\n\\n${projectContext}\\n\\n---\\n\\n## GitHub Strategy\\n\\n${githubStrategy}\\n`;\n\nreturn [{\n  json: {\n    ...jobData,\n    tier4_status: 'complete',\n    portfolio_content: portfolioContent\n  }\n}];"
       }
     },
     {
@@ -178,7 +178,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const jobData = $input.item.json;\nconst githubToken = process.env.GITHUB_TOKEN || '';\n\nif (!githubToken) {\n  console.log('Warning: GITHUB_TOKEN not set, skipping git commit');\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'skipped'\n    }\n  }];\n}\n\nconst owner = 'odeliyach';\nconst repo = 'job-search-data';\nconst apiBase = 'https://api.github.com';\nconst headers = {\n  'Authorization': 'token ' + githubToken,\n  'Accept': 'application/vnd.github.v3+json',\n  'Content-Type': 'application/json'\n};\n\nasync function apiRequest(method, path, body) {\n  return await $helpers.httpRequest({\n    method: method,\n    url: apiBase + path,\n    headers: headers,\n    body: body,\n  });\n}\n\n// Auto-create folder by adding .gitkeep if missing\nasync function ensureFolderExists(treeItems, folderPath) {\n  treeItems.push({\n    path: 'Obsidian_Vault/' + folderPath + '/.gitkeep',\n    mode: '100644',\n    type: 'blob',\n    content: ''\n  });\n}\n\n// Determine target folder based on application status\nfunction getStatusFolder(status) {\n  const folderMap = {\n    'applied': 'Active',\n    'phone_screen_scheduled': 'Waiting',\n    'technical_scheduled': 'Waiting',\n    'final_round_scheduled': 'Waiting',\n    'offer_received': 'Offers',\n    'rejected': 'Rejected'\n  };\n  return folderMap[status] || 'Active';\n}\n\ntry {\n  const refData = await apiRequest('GET', '/repos/' + owner + '/' + repo + '/git/refs/heads/main');\n  const currentSha = refData.object.sha;\n\n  const commitData = await apiRequest('GET', '/repos/' + owner + '/' + repo + '/git/commits/' + currentSha);\n  const treeSha = commitData.tree.sha;\n\n  const filesToCommit = [];\n  const companySlug = (jobData.company_name || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '-');\n  const statusFolder = getStatusFolder(jobData.status || 'applied');\n  const appFolderPath = 'Obsidian_Vault/Job_Applications/' + statusFolder + '/' + companySlug;\n  const resumeVersionPath = 'Obsidian_Vault/My_Materials/Resume_Versions';\n  const interviewPrepPath = 'Obsidian_Vault/Interview_Prep/Company_Specific';\n  const dashboardPath = 'Obsidian_Vault/Dashboard';\n\n  // ---- Ensure required folders exist ----\n  await ensureFolderExists(filesToCommit, 'Job_Applications/Active');\n  await ensureFolderExists(filesToCommit, 'Job_Applications/Waiting');\n  await ensureFolderExists(filesToCommit, 'Job_Applications/Offers');\n  await ensureFolderExists(filesToCommit, 'Job_Applications/Rejected');\n  await ensureFolderExists(filesToCommit, 'My_Materials/Resume_Versions');\n  await ensureFolderExists(filesToCommit, 'My_Materials/Portfolio_Projects');\n  await ensureFolderExists(filesToCommit, 'Interview_Prep/Company_Specific');\n  await ensureFolderExists(filesToCommit, 'Dashboard');\n  await ensureFolderExists(filesToCommit, 'Resources');\n  await ensureFolderExists(filesToCommit, 'Templates');\n\n  // ---- Build Company Application File ----\n  const today = new Date().toISOString().split('T')[0];\n  const companyFileContent = '---\\n' +\n    'company: ' + jobData.company_name + '\\n' +\n    'role: ' + jobData.job_title + '\\n' +\n    'location: ' + (jobData.location || 'N/A') + '\\n' +\n    'applied_date: ' + (jobData.applied_date || today) + '\\n' +\n    'status: ' + (jobData.status || 'applied') + '\\n' +\n    'job_url: ' + (jobData.job_url || '') + '\\n' +\n    'application_id: ' + (jobData.application_id || '') + '\\n' +\n    'salary_range: ' + (jobData.salary_range || 'TBD') + '\\n' +\n    'hiring_manager_email: ' + (jobData.hiring_manager_email || '') + '\\n' +\n    'follow_up_day3: ' + (jobData.applied_date || today) + '\\n' +\n    'follow_up_day7: ' + (jobData.applied_date || today) + '\\n' +\n    '---\\n\\n' +\n    '# ' + jobData.company_name + ' - ' + jobData.job_title + '\\n\\n' +\n    '## Job Requirements vs My Skills\\n\\n' +\n    '### Requirements\\n' + (jobData.job_requirements || '') + '\\n\\n' +\n    '### My Skills Match\\n' + (jobData.user_skills || '') + '\\n\\n' +\n    '## Generated Materials\\n\\n' +\n    '### Resume\\n' + (jobData.resume_content || '') + '\\n\\n' +\n    '### Cover Letter\\n' + (jobData.cover_letter_content || '') + '\\n\\n' +\n    '### Cold Email\\n' + (jobData.cold_email_content || '') + '\\n\\n' +\n    '### Interview Prep\\n' + (jobData.interview_prep_content || '') + '\\n\\n' +\n    '### Portfolio Matching\\n' + (jobData.portfolio_content || '') + '\\n\\n' +\n    '## Communication Log\\n\\n' +\n    '- **' + today + '** | Applied | Submitted application\\n\\n' +\n    '## Follow-up Schedule\\n\\n' +\n    '- [ ] Day 3 (' + (jobData.applied_date || today) + ' + 3 days): First follow-up\\n' +\n    '- [ ] Day 7 (' + (jobData.applied_date || today) + ' + 7 days): Second follow-up\\n' +\n    '- [ ] Post-phone screen: Thank you email\\n' +\n    '- [ ] Post-technical: Thank you email\\n\\n' +\n    '## Personal Notes\\n\\n' +\n    '_Add your notes here after each interaction_\\n';\n\n  filesToCommit.push({\n    path: appFolderPath + '/' + companySlug + '.md',\n    mode: '100644',\n    type: 'blob',\n    content: companyFileContent\n  });\n\n  // ---- Resume Version File ----\n  const resumeVersionHash = Date.now().toString(36);\n  const resumeVersionContent = '# Resume Version - ' + jobData.company_name + '\\n\\n' +\n    '**Date:** ' + today + '\\n' +\n    '**Job:** ' + jobData.job_title + ' at ' + jobData.company_name + '\\n' +\n    '**Version:** ' + resumeVersionHash + '\\n\\n' +\n    (jobData.resume_content || '') + '\\n';\n\n  filesToCommit.push({\n    path: resumeVersionPath + '/' + companySlug + '_resume_' + resumeVersionHash + '.md',\n    mode: '100644',\n    type: 'blob',\n    content: resumeVersionContent\n  });\n\n  // ---- Interview Prep File ----\n  const interviewContent = '# Interview Prep - ' + jobData.company_name + '\\n\\n' +\n    '**Role:** ' + jobData.job_title + '\\n' +\n    '**Prepared:** ' + today + '\\n\\n' +\n    (jobData.interview_prep_content || '') + '\\n';\n\n  filesToCommit.push({\n    path: interviewPrepPath + '/' + companySlug + '_interview.md',\n    mode: '100644',\n    type: 'blob',\n    content: interviewContent\n  });\n\n  // ---- Legacy files for backward compatibility ----\n  const legacyContentMap = {\n    'metadata.md': jobData.metadata_content,\n    'cold_email.md': jobData.cold_email_content,\n    'company_research.md': jobData.company_research_content,\n    'personal_angle.md': jobData.personal_angle_content,\n    'portfolio_matching.md': jobData.portfolio_content,\n    'tracking.md': jobData.tracking_content\n  };\n\n  for (const [fileName, content] of Object.entries(legacyContentMap)) {\n    if (!content) continue;\n    const repoPath = (jobData.year || new Date().getFullYear()) + '/' +\n      (jobData.month || (new Date().getMonth() + 1).toString().padStart(2, '0')) + '/' +\n      (jobData.folder_name || companySlug) + '/' + fileName;\n    filesToCommit.push({ path: repoPath, mode: '100644', type: 'blob', content: content });\n  }\n\n  if (jobData.analytics_content) {\n    filesToCommit.push({ path: 'analytics.md', mode: '100644', type: 'blob', content: jobData.analytics_content });\n  }\n\n  if (filesToCommit.length === 0) {\n    return [{\n      json: {\n        ...jobData,\n        git_status: 'skipped',\n        git_note: 'No content to commit'\n      }\n    }];\n  }\n\n  // Create blobs and build tree entries\n  const treeEntries = [];\n  for (const file of filesToCommit) {\n    try {\n      if (file.sha) {\n        treeEntries.push({ path: file.path, mode: file.mode, type: file.type, sha: file.sha });\n      } else {\n        const blobData = await apiRequest('POST', '/repos/' + owner + '/' + repo + '/git/blobs', {\n          content: Buffer.from(file.content || '').toString('base64'),\n          encoding: 'base64'\n        });\n        treeEntries.push({ path: file.path, mode: file.mode, type: file.type, sha: blobData.sha });\n      }\n    } catch(e) {\n      console.error('Error processing file ' + file.path + ':', e.message);\n    }\n  }\n\n  const newTreeData = await apiRequest('POST', '/repos/' + owner + '/' + repo + '/git/trees', {\n    base_tree: treeSha,\n    tree: treeEntries\n  });\n\n  const commitMessage = 'Job application: ' + jobData.company_name + ' - ' + jobData.job_title + ' - ' + (jobData.applied_date || today);\n  const newCommitData = await apiRequest('POST', '/repos/' + owner + '/' + repo + '/git/commits', {\n    message: commitMessage,\n    tree: newTreeData.sha,\n    parents: [currentSha],\n    author: {\n      name: 'Odeliya Charitonova',\n      email: 'odaliya12@gmail.com',\n      date: new Date().toISOString()\n    }\n  });\n\n  await apiRequest('PATCH', '/repos/' + owner + '/' + repo + '/git/refs/heads/main', {\n    sha: newCommitData.sha,\n    force: false\n  });\n\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'success',\n      commit_sha: newCommitData.sha,\n      obsidian_path: appFolderPath,\n      resume_version_path: resumeVersionPath,\n      interview_prep_path: interviewPrepPath\n    }\n  }];\n\n} catch(e) {\n  console.error('Git commit failed:', e.message);\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'error',\n      git_error: e.message\n    }\n  }];\n}"
+        "jsCode": "const jobData = $input.item.json;\n const githubToken = $env.GITHUB_TOKEN || '';\n\nif (!githubToken) {\n  console.log('Warning: GITHUB_TOKEN not set, skipping git commit');\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'skipped'\n    }\n  }];\n}\n\nconst owner = 'odeliyach';\nconst repo = 'job-search-data';\nconst apiBase = 'https://api.github.com';\nconst headers = {\n  'Authorization': `token ${githubToken}`,\n  'Accept': 'application/vnd.github.v3+json',\n  'Content-Type': 'application/json'\n};\n\nasync function apiRequest(method, path, body) {\n  return await $helpers.httpRequest({\n    method: method,\n    url: `${apiBase}${path}`,\n    headers: headers,\n    body: body,\n  });\n}\n\ntry {\n  const refData = await apiRequest('GET', `/repos/${owner}/${repo}/git/refs/heads/main`);\n  const currentSha = refData.object.sha;\n\n  const commitData = await apiRequest('GET', `/repos/${owner}/${repo}/git/commits/${currentSha}`);\n  const treeSha = commitData.tree.sha;\n\n  const filesToCommit = [];\n\n  const contentMap = {\n    'metadata.md': jobData.metadata_content,\n    'resume.md': jobData.resume_content,\n    'cover_letter.md': jobData.cover_letter_content,\n    'cold_email.md': jobData.cold_email_content,\n    'company_research.md': jobData.company_research_content,\n    'personal_angle.md': jobData.personal_angle_content,\n    'interview_prep.md': jobData.interview_prep_content,\n    'portfolio_matching.md': jobData.portfolio_content,\n    'tracking.md': jobData.tracking_content\n  };\n\n  for (const [fileName, content] of Object.entries(contentMap)) {\n    if (!content) {\n      console.log(`Skipping ${fileName}: no content available`);\n      continue;\n    }\n    try {\n      const blobData = await apiRequest('POST', `/repos/${owner}/${repo}/git/blobs`, {\n        content: Buffer.from(content).toString('base64'),\n        encoding: 'base64'\n      });\n      const repoPath = `${jobData.year}/${jobData.month}/${jobData.folder_name}/${fileName}`;\n      filesToCommit.push({ path: repoPath, mode: '100644', type: 'blob', sha: blobData.sha });\n    } catch(e) {\n      console.error(`Error processing file ${fileName}:`, e.message);\n    }\n  }\n\n  if (jobData.analytics_content) {\n    try {\n      const analyticsBlobData = await apiRequest('POST', `/repos/${owner}/${repo}/git/blobs`, {\n        content: Buffer.from(jobData.analytics_content).toString('base64'),\n        encoding: 'base64'\n      });\n      filesToCommit.push({ path: 'analytics.md', mode: '100644', type: 'blob', sha: analyticsBlobData.sha });\n    } catch(e) {\n      console.error('Error processing analytics.md:', e.message);\n    }\n  }\n\n  if (filesToCommit.length === 0) {\n    return [{\n      json: {\n        ...jobData,\n        git_status: 'skipped',\n        git_note: 'No content to commit'\n      }\n    }];\n  }\n\n  const newTreeData = await apiRequest('POST', `/repos/${owner}/${repo}/git/trees`, {\n    base_tree: treeSha,\n    tree: filesToCommit\n  });\n  const newTreeSha = newTreeData.sha;\n\n  const commitMessage = `Job application: ${jobData.company_name} - ${jobData.job_title} - ${jobData.applied_date}`;\n  const newCommitData = await apiRequest('POST', `/repos/${owner}/${repo}/git/commits`, {\n    message: commitMessage,\n    tree: newTreeSha,\n    parents: [currentSha],\n    author: {\n      name: 'Odeliya Charitonova',\n      email: 'odaliya12@gmail.com',\n      date: new Date().toISOString()\n    }\n  });\n  const newCommitSha = newCommitData.sha;\n\n  await apiRequest('PATCH', `/repos/${owner}/${repo}/git/refs/heads/main`, {\n    sha: newCommitSha,\n    force: false\n  });\n\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'success',\n      commit_sha: newCommitSha\n    }\n  }];\n\n} catch(e) {\n  console.error('Git commit failed:', e.message);\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'error',\n      git_error: e.message\n    }\n  }];\n}"
       }
     },
     {
@@ -201,73 +201,8 @@
         "toEmail": "odeliya.charitonova.dev@gmail.com",
         "subject": "=Job Application Complete: {{ $('Tier 5 - Database & Tracking').item.json.company_name }} - {{ $('Tier 5 - Database & Tracking').item.json.job_title }}",
         "emailFormat": "html",
-        "html": "=<html><body style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\"><h2 style=\"color: #28a745;\">Application Status: \u2705 Complete</h2><hr/><table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px;\"><tr><td style=\"padding: 8px; font-weight: bold; width: 140px;\">Company:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.company_name }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Position:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.job_title }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Location:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.location }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Applied:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.applied_date }}</td></tr></table><h3>Next Steps:</h3><ul><li>Follow-up reminder: {{ $('Tier 5 - Database &amp; Tracking').item.json.follow_up_1_date }}</li><li>Interview prep materials: Check tracking.md in vault</li><li>Cold outreach: Send intro email within 2-3 days</li></ul><h3>Files Generated:</h3><ul><li>Resume (tailored)</li><li>Cover letter</li><li>Interview prep materials</li><li>Portfolio recommendations</li><li>Cold email templates</li></ul><p><strong>View full details:</strong> /vault/{{ $('Tier 5 - Database &amp; Tracking').item.json.year }}/{{ $('Tier 5 - Database &amp; Tracking').item.json.month }}/{{ $('Tier 5 - Database &amp; Tracking').item.json.folder_name }}/</p><p><strong>Total Applications:</strong> {{ $('Tier 5 - Database &amp; Tracking').item.json.total_applications }}</p></body></html>",
+        "html": "=<html><body style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\"><h2 style=\"color: #28a745;\">Application Status: ✅ Complete</h2><hr/><table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px;\"><tr><td style=\"padding: 8px; font-weight: bold; width: 140px;\">Company:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.company_name }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Position:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.job_title }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Location:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.location }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Applied:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.applied_date }}</td></tr></table><h3>Next Steps:</h3><ul><li>Follow-up reminder: {{ $('Tier 5 - Database &amp; Tracking').item.json.follow_up_1_date }}</li><li>Interview prep materials: Check tracking.md in vault</li><li>Cold outreach: Send intro email within 2-3 days</li></ul><h3>Files Generated:</h3><ul><li>Resume (tailored)</li><li>Cover letter</li><li>Interview prep materials</li><li>Portfolio recommendations</li><li>Cold email templates</li></ul><p><strong>View full details:</strong> /vault/{{ $('Tier 5 - Database &amp; Tracking').item.json.year }}/{{ $('Tier 5 - Database &amp; Tracking').item.json.month }}/{{ $('Tier 5 - Database &amp; Tracking').item.json.folder_name }}/</p><p><strong>Total Applications:</strong> {{ $('Tier 5 - Database &amp; Tracking').item.json.total_applications }}</p></body></html>",
         "options": {}
-      }
-    },
-    {
-      "id": "ats-keyword-node-xyz",
-      "name": "ATS Keyword Optimization",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        950,
-        300
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const jobData = $input.item.json;\n\n// ATS keyword scanning and optimization\nconst jobDescription = jobData.job_description || '';\nconst jobRequirements = jobData.job_requirements || '';\nconst fullJobText = jobDescription + ' ' + jobRequirements;\n\n// Common technical keywords to check\nconst techKeywords = {\n  cloud: ['aws', 'gcp', 'azure', 'ec2', 's3', 'lambda', 'rds', 'vpc', 'compute engine', 'cloud run', 'firestore'],\n  containerization: ['docker', 'kubernetes', 'k8s', 'helm', 'container', 'orchestration'],\n  cicd: ['github actions', 'gitlab ci', 'jenkins', 'circleci', 'ci/cd', 'deployment pipeline'],\n  architecture: ['microservices', 'distributed systems', 'scalability', 'system design', 'rest api', 'graphql'],\n  databases: ['sql', 'nosql', 'redis', 'postgresql', 'mysql', 'mongodb', 'elasticsearch'],\n  testing: ['jest', 'vitest', 'cypress', 'playwright', 'unit test', 'integration test', 'e2e'],\n  languages: ['typescript', 'javascript', 'python', 'java', 'go', 'rust', 'node.js', 'react', 'vue', 'angular'],\n  devops: ['terraform', 'ansible', 'monitoring', 'observability', 'elk stack', 'datadog', 'prometheus']\n};\n\nconst fullJobTextLower = fullJobText.toLowerCase();\nconst foundKeywords = [];\nconst missingKeywords = [];\n\nfor (const [category, keywords] of Object.entries(techKeywords)) {\n  for (const keyword of keywords) {\n    if (fullJobTextLower.includes(keyword.toLowerCase())) {\n      foundKeywords.push({ keyword, category });\n    }\n  }\n}\n\n// Extract all keywords from job description using simple word frequency\nconst words = fullJobTextLower.split(/\\W+/).filter(w => w.length > 3);\nconst wordFreq = {};\nwords.forEach(w => { wordFreq[w] = (wordFreq[w] || 0) + 1; });\nconst topWords = Object.entries(wordFreq)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 20)\n  .map(([word]) => word);\n\nreturn [{\n  json: {\n    ...jobData,\n    ats_found_keywords: foundKeywords,\n    ats_top_job_keywords: topWords,\n    ats_keyword_count: foundKeywords.length,\n    ats_status: 'complete'\n  }\n}];"
-      }
-    },
-    {
-      "id": "merge-results-xyz",
-      "name": "Merge Results",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 2.3,
-      "position": [
-        2150,
-        300
-      ],
-      "parameters": {
-        "mode": "enrichOutput",
-        "sourceKey": "item",
-        "targetKey": "merged_item"
-      }
-    },
-    {
-      "id": "notify-approval-pending",
-      "name": "Notify: Email Ready for Approval",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [
-        2700,
-        150
-      ],
-      "credentials": {
-        "smtp": {
-          "id": "smtp-credential",
-          "name": "Gmail SMTP"
-        }
-      },
-      "parameters": {
-        "fromEmail": "odeliya.charitonova.dev@gmail.com",
-        "toEmail": "odeliya.charitonova.dev@gmail.com",
-        "subject": "\u23f8\ufe0f Email Ready for Your Approval - Review Before Sending",
-        "emailFormat": "html",
-        "html": "<h2>Email Ready for Your Approval</h2><p><strong>Type:</strong> Follow-up Email / Response</p><p><strong>Company/Recipient:</strong> [Company]</p><p><strong>Status:</strong> Waiting for your approval in N8N</p><hr><h3>Next Step:</h3><p>Go to N8N and click <strong>'Resume'</strong> to approve the email.</p><p>Or click <strong>'Retry'</strong> if you want to edit the email.</p><p><strong>\u26a0\ufe0f IMPORTANT:</strong> Do NOT manually edit the email content. The system will send the pre-approved version exactly as generated.</p><p>Once you approve, the email will be sent immediately to the hiring manager.</p>"
-      }
-    },
-    {
-      "id": "manual-approval-email",
-      "name": "Manual Approval - Review Email",
-      "type": "n8n-nodes-base.pause",
-      "typeVersion": 1,
-      "position": [
-        2750,
-        300
-      ],
-      "parameters": {
-        "resume": true
       }
     }
   ],
@@ -298,46 +233,7 @@
       "main": [
         [
           {
-            "node": "ATS Keyword Optimization",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "ATS Keyword Optimization": {
-      "main": [
-        [
-          {
             "node": "Tier 1 - Core Application",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Tier 2 - Cold Outreach",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Tier 3 - Interview Prep",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Tier 4 - Portfolio Matching",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Tier 5 - Database & Tracking",
             "type": "main",
             "index": 0
           }
@@ -348,7 +244,7 @@
       "main": [
         [
           {
-            "node": "Merge Results",
+            "node": "Tier 2 - Cold Outreach",
             "type": "main",
             "index": 0
           }
@@ -359,7 +255,7 @@
       "main": [
         [
           {
-            "node": "Merge Results",
+            "node": "Tier 3 - Interview Prep",
             "type": "main",
             "index": 0
           }
@@ -370,7 +266,7 @@
       "main": [
         [
           {
-            "node": "Merge Results",
+            "node": "Tier 4 - Portfolio Matching",
             "type": "main",
             "index": 0
           }
@@ -381,7 +277,7 @@
       "main": [
         [
           {
-            "node": "Merge Results",
+            "node": "Tier 5 - Database & Tracking",
             "type": "main",
             "index": 0
           }
@@ -389,17 +285,6 @@
       ]
     },
     "Tier 5 - Database & Tracking": {
-      "main": [
-        [
-          {
-            "node": "Merge Results",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge Results": {
       "main": [
         [
           {
@@ -411,28 +296,6 @@
       ]
     },
     "Git Commit - job-search-data": {
-      "main": [
-        [
-          {
-            "node": "Notify: Email Ready for Approval",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Notify: Email Ready for Approval": {
-      "main": [
-        [
-          {
-            "node": "Manual Approval - Review Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Manual Approval - Review Email": {
       "main": [
         [
           {
