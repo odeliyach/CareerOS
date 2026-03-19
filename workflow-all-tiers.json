@@ -1,0 +1,310 @@
+{
+  "name": "Job Search Automation - All 5 Tiers",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodes": [
+    {
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5",
+      "name": "Start Job Application",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-f1a2b3c4d5e6",
+      "name": "Set Job Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-01",
+              "name": "job_url",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "assign-02",
+              "name": "job_description",
+              "value": "Enter full job description here",
+              "type": "string"
+            },
+            {
+              "id": "assign-03",
+              "name": "company_name",
+              "value": "Company Name",
+              "type": "string"
+            },
+            {
+              "id": "assign-04",
+              "name": "job_title",
+              "value": "Job Title",
+              "type": "string"
+            },
+            {
+              "id": "assign-05",
+              "name": "location",
+              "value": "Location",
+              "type": "string"
+            },
+            {
+              "id": "assign-06",
+              "name": "user_skills",
+              "value": "React, Node.js, Python, TypeScript, AWS, Docker, PostgreSQL, REST APIs, Git, Agile",
+              "type": "string"
+            },
+            {
+              "id": "assign-07",
+              "name": "tech_stack",
+              "value": "React, TypeScript, Node.js",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-a2b3c4d5e6f7",
+      "name": "Parse Job Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.item.json;\nconst companyName = item.company_name || '';\nconst jobTitle = item.job_title || '';\nconst location = item.location || '';\nconst jobUrl = item.job_url || '';\nconst jobDescription = item.job_description || '';\nconst userSkills = item.user_skills || '';\nconst techStack = item.tech_stack || '';\n\nconst id = 'app-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);\n\nconst now = new Date();\nconst year = now.getFullYear().toString();\nconst month = String(now.getMonth() + 1).padStart(2, '0');\nconst day = String(now.getDate()).padStart(2, '0');\nconst appliedDate = `${year}-${month}-${day}`;\n\nconst folderName = `${day}_${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${jobTitle.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20)}`;\nconst folderPath = `/home/n8n/.n8n/vault/${year}/${month}/${folderName}`;\n\nconst jobRequirements = jobDescription;\n\nreturn [{\n  json: {\n    application_id: id,\n    company_name: companyName,\n    job_title: jobTitle,\n    location: location,\n    job_url: jobUrl,\n    job_description: jobDescription,\n    job_requirements: jobRequirements,\n    user_skills: userSkills,\n    tech_stack: techStack,\n    applied_date: appliedDate,\n    folder_path: folderPath,\n    year: year,\n    month: month,\n    day: day,\n    vault_path: '/home/n8n/.n8n/vault',\n    folder_name: folderName\n  }\n}];"
+      }
+    },
+    {
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-b3c4d5e6f7a8",
+      "name": "Tier 1 - Core Application",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const jobData = $input.item.json;\nconst fs = require('fs');\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false },\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return `[Ollama Error: ${e.message}]`;\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst resumePrompt = `Generate a tailored resume for ${jobData.company_name} ${jobData.job_title} position. Job requirements: ${jobData.job_requirements}. User skills: ${jobData.user_skills}. Match skills exactly to requirements. Use metrics and STAR method. Format as professional resume with sections: Summary, Experience, Skills, Education. Be specific and quantifiable.`;\n\nconst coverLetterPrompt = `Write a compelling cover letter for ${jobData.company_name} ${jobData.job_title} position. Show genuine interest in the company and role. Be personal, specific, and professional. Keep to 3-4 paragraphs. Explain why you're interested in this specific company and role, not generic application letter.`;\n\nconst resume = await callOllama(resumePrompt);\nconst coverLetter = await callOllama(coverLetterPrompt);\n\nfs.mkdirSync(jobData.folder_path, { recursive: true });\n\nconst metadata = `# Application: ${jobData.company_name} - ${jobData.job_title}\n\n- Company: ${jobData.company_name}\n- Title: ${jobData.job_title}\n- Location: ${jobData.location}\n- URL: ${jobData.job_url}\n- Applied: ${jobData.applied_date}\n- Application ID: ${jobData.application_id}\n\n## Job Description\n${jobData.job_description}\n\n## Requirements\n${jobData.job_requirements}\n`;\n\nfs.writeFileSync(`${jobData.folder_path}/metadata.md`, metadata);\nfs.writeFileSync(`${jobData.folder_path}/resume.md`, `# Resume - ${jobData.job_title} at ${jobData.company_name}\n\n${resume}`);\nfs.writeFileSync(`${jobData.folder_path}/cover_letter.md`, `# Cover Letter - ${jobData.company_name}\n\n${coverLetter}`);\n\nreturn [{\n  json: {\n    ...jobData,\n    tier1_status: 'complete',\n    resume_preview: resume.substring(0, 300)\n  }\n}];"
+      }
+    },
+    {
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-c4d5e6f7a8b9",
+      "name": "Tier 2 - Cold Outreach",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const jobData = $input.item.json;\nconst fs = require('fs');\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false },\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return `[Ollama Error: ${e.message}]`;\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst introEmailPrompt = `Create a professional introduction email to ${jobData.company_name} for ${jobData.job_title} position. Make it compelling, personalized, and specific. Under 150 words. Include: your value proposition, specific interest in company, call to action. Be authentic, not generic.`;\n\nconst followupEmailPrompt = `Create a follow-up email for ${jobData.company_name} ${jobData.job_title} position. Show genuine interest, reference previous contact/application. Build on introduction. Under 100 words. Be professional but personable.`;\n\nconst companyResearchPrompt = `Research and provide detailed information about ${jobData.company_name}. Include: industry/sector, recent news and achievements, company size and growth, key decision-makers if known, company culture indicators, recent funding/partnerships, growth metrics, hiring trends. Format as comprehensive bullet-point analysis.`;\n\nconst personalAnglePrompt = `Identify personal connection angles for contacting ${jobData.company_name} for ${jobData.job_title}. Look for: alumni connections, shared interests or values, industry events, mutual LinkedIn connections, shared projects or open source, content they've published, hiring manager information. Suggest specific outreach strategy for each angle.`;\n\nconst introEmail = await callOllama(introEmailPrompt);\nconst followupEmail = await callOllama(followupEmailPrompt);\nconst companyResearch = await callOllama(companyResearchPrompt);\nconst personalAngle = await callOllama(personalAnglePrompt);\n\nconst coldEmailContent = `# Cold Email Templates - ${jobData.company_name}\n\n## Introduction Email\n\n${introEmail}\n\n---\n\n## Follow-up Email\n\n${followupEmail}\n`;\n\nfs.writeFileSync(`${jobData.folder_path}/cold_email.md`, coldEmailContent);\nfs.writeFileSync(`${jobData.folder_path}/company_research.md`, `# Company Research - ${jobData.company_name}\n\n${companyResearch}`);\nfs.writeFileSync(`${jobData.folder_path}/personal_angle.md`, `# Personal Connection Angles - ${jobData.company_name}\n\n${personalAngle}`);\n\nreturn [{\n  json: {\n    ...jobData,\n    tier2_status: 'complete'\n  }\n}];"
+      }
+    },
+    {
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-d5e6f7a8b9c0",
+      "name": "Tier 3 - Interview Prep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const jobData = $input.item.json;\nconst fs = require('fs');\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false },\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return `[Ollama Error: ${e.message}]`;\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst skillsGapPrompt = `Analyze skills gap for ${jobData.job_title} at ${jobData.company_name}. Required skills: ${jobData.job_requirements}. User current skills: ${jobData.user_skills}. Create detailed gap analysis with: missing skills, skill levels needed, learning priorities, estimated timeline to close gaps, resources for learning. Format as actionable plan.`;\n\nconst interviewQuestionsPrompt = `Generate 10 interview questions for ${jobData.job_title} at ${jobData.company_name}. Include: 5 technical depth questions specific to tech stack ${jobData.tech_stack}, 3 behavioral questions using STAR method, 2 company-specific culture questions. Provide follow-up prompts for deeper discussion.`;\n\nconst talkingPointsPrompt = `Create comprehensive talking points for interviewing at ${jobData.company_name} for ${jobData.job_title}. Include: your most relevant projects with metrics, key technical achievements, industry insights relevant to company, company-specific angles showing research, answers to likely questions, questions to ask interviewer. Format for easy reference during interviews.`;\n\nconst salaryGuidePrompt = `Research salary standards for ${jobData.job_title} in ${jobData.location}. Provide: median salary, typical salary range (25th-75th percentile), negotiation tactics, benefits evaluation framework, total compensation breakdown (salary, bonus, stock, benefits), market trends, comparable companies. Include negotiation strategies and red flags.`;\n\nconst skillsGap = await callOllama(skillsGapPrompt);\nconst interviewQuestions = await callOllama(interviewQuestionsPrompt);\nconst talkingPoints = await callOllama(talkingPointsPrompt);\nconst salaryGuide = await callOllama(salaryGuidePrompt);\n\nconst interviewPrepContent = `# Interview Prep - ${jobData.company_name} - ${jobData.job_title}\n\n## Skills Gap Analysis\n\n${skillsGap}\n\n---\n\n## Interview Questions\n\n${interviewQuestions}\n\n---\n\n## Talking Points\n\n${talkingPoints}\n\n---\n\n## Salary Guide\n\n${salaryGuide}\n`;\n\nfs.writeFileSync(`${jobData.folder_path}/interview_prep.md`, interviewPrepContent);\n\nreturn [{\n  json: {\n    ...jobData,\n    tier3_status: 'complete'\n  }\n}];"
+      }
+    },
+    {
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-e6f7a8b9c0d1",
+      "name": "Tier 4 - Portfolio Matching",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const jobData = $input.item.json;\nconst fs = require('fs');\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false },\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return `[Ollama Error: ${e.message}]`;\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst projectSelectionPrompt = `From user's GitHub (username: odeliyach), identify and select the 5 projects most relevant to ${jobData.job_description} for ${jobData.job_title}. Explain why each project is relevant. Consider: technical skills match, complexity, business impact, recency, documentation quality.`;\n\nconst metricsPrompt = `For the selected projects, create quantifiable metrics showing impact. For each project include: performance improvements (%, ms, throughput), user growth metrics, cost savings, engagement metrics, scalability metrics, code quality metrics. Use specific numbers and percentages.`;\n\nconst projectContextPrompt = `For each selected project provide: original objectives/problem solved, technical challenges faced, your specific role and responsibilities, technologies/tools used, impact achieved, lessons learned. Be detailed and business-focused.`;\n\nconst githubStrategyPrompt = `Provide strategies to improve GitHub visibility for these projects to attract ${jobData.company_name} attention. Include: README improvements, demo links/videos, contribution stats highlighting, deployment links, relevant badges, documentation enhancement, community engagement, GitHub profile optimization.`;\n\nconst projectSelection = await callOllama(projectSelectionPrompt);\nconst metrics = await callOllama(metricsPrompt);\nconst projectContext = await callOllama(projectContextPrompt);\nconst githubStrategy = await callOllama(githubStrategyPrompt);\n\nconst portfolioContent = `# Portfolio Matching - ${jobData.company_name} - ${jobData.job_title}\n\n## Project Selection\n\n${projectSelection}\n\n---\n\n## Project Metrics\n\n${metrics}\n\n---\n\n## Project Context\n\n${projectContext}\n\n---\n\n## GitHub Strategy\n\n${githubStrategy}\n`;\n\nfs.writeFileSync(`${jobData.folder_path}/portfolio_matching.md`, portfolioContent);\n\nreturn [{\n  json: {\n    ...jobData,\n    tier4_status: 'complete'\n  }\n}];"
+      }
+    },
+    {
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-f7a8b9c0d1e2",
+      "name": "Tier 5 - Database & Tracking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2300,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const jobData = $input.item.json;\nconst { execSync } = require('child_process');\nconst fs = require('fs');\nconst dbPath = '/home/n8n/.n8n/job_search.db';\n\nfunction sqlExec(sql) {\n  try {\n    const tmpFile = `/tmp/sql_${jobData.application_id}_${Date.now()}.sql`;\n    fs.writeFileSync(tmpFile, sql);\n    execSync(`sqlite3 ${dbPath} < ${tmpFile}`, { timeout: 10000 });\n    fs.unlinkSync(tmpFile);\n  } catch(e) {\n    console.error('SQLite error:', e.message);\n  }\n}\n\nfunction escapeSql(s) {\n  return String(s || '').replace(/'/g, \"''\");\n}\n\nsqlExec(`CREATE TABLE IF NOT EXISTS applications (\n  id TEXT PRIMARY KEY,\n  company_name TEXT,\n  job_title TEXT,\n  location TEXT,\n  job_url TEXT,\n  job_description TEXT,\n  applied_date TEXT,\n  status TEXT DEFAULT 'applied',\n  folder_path TEXT,\n  created_at TEXT DEFAULT CURRENT_TIMESTAMP\n);`);\n\nsqlExec(`CREATE TABLE IF NOT EXISTS tier_outputs (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  application_id TEXT,\n  tier_name TEXT,\n  status TEXT,\n  created_at TEXT DEFAULT CURRENT_TIMESTAMP\n);`);\n\nsqlExec(`CREATE TABLE IF NOT EXISTS follow_ups (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  application_id TEXT,\n  due_date TEXT,\n  type TEXT,\n  status TEXT DEFAULT 'pending',\n  created_at TEXT DEFAULT CURRENT_TIMESTAMP\n);`);\n\nsqlExec(`CREATE TABLE IF NOT EXISTS analytics (\n  id TEXT PRIMARY KEY,\n  metric_name TEXT,\n  metric_value INTEGER,\n  last_updated TEXT\n);`);\n\nsqlExec(`INSERT OR REPLACE INTO applications (id, company_name, job_title, location, job_url, job_description, applied_date, status, folder_path) VALUES (\n  '${escapeSql(jobData.application_id)}',\n  '${escapeSql(jobData.company_name)}',\n  '${escapeSql(jobData.job_title)}',\n  '${escapeSql(jobData.location)}',\n  '${escapeSql(jobData.job_url)}',\n  '${escapeSql(jobData.job_description)}',\n  '${escapeSql(jobData.applied_date)}',\n  'applied',\n  '${escapeSql(jobData.folder_path)}'\n);`);\n\nconst tiers = ['tier1', 'tier2', 'tier3', 'tier4', 'tier5'];\nfor (const tier of tiers) {\n  sqlExec(`INSERT INTO tier_outputs (application_id, tier_name, status) VALUES ('${escapeSql(jobData.application_id)}', '${tier}', 'complete');`);\n}\n\nconst now = new Date();\nconst fu1Date = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];\nconst fu2Date = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];\nconst fu3Date = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];\n\nsqlExec(`INSERT INTO follow_ups (application_id, due_date, type) VALUES ('${escapeSql(jobData.application_id)}', '${fu1Date}', 'follow_up_1');`);\nsqlExec(`INSERT INTO follow_ups (application_id, due_date, type) VALUES ('${escapeSql(jobData.application_id)}', '${fu2Date}', 'follow_up_2');`);\nsqlExec(`INSERT INTO follow_ups (application_id, due_date, type) VALUES ('${escapeSql(jobData.application_id)}', '${fu3Date}', 'follow_up_3');`);\n\nsqlExec(`INSERT OR REPLACE INTO analytics (id, metric_name, metric_value, last_updated) VALUES ('total_applications', 'total_applications', COALESCE((SELECT metric_value FROM analytics WHERE id = 'total_applications'), 0) + 1, datetime('now'));`);\n\nlet totalApplications = 1;\ntry {\n  const result = execSync(`sqlite3 ${dbPath} 'SELECT COUNT(*) FROM applications'`, { encoding: 'utf8', timeout: 10000 });\n  totalApplications = parseInt(result.trim()) || 1;\n} catch(e) {\n  console.error('Count query error:', e.message);\n}\n\nconst trackingContent = `# Application Tracking: ${jobData.company_name} - ${jobData.job_title}\n\n## Status\n- Application ID: ${jobData.application_id}\n- Status: Applied\n- Applied Date: ${jobData.applied_date}\n\n## Follow-up Schedule\n- Follow-up 1: ${fu1Date}\n- Follow-up 2: ${fu2Date}\n- Follow-up 3: ${fu3Date}\n\n## Generated Files\n- [metadata.md](metadata.md)\n- [resume.md](resume.md)\n- [cover_letter.md](cover_letter.md)\n- [cold_email.md](cold_email.md)\n- [company_research.md](company_research.md)\n- [personal_angle.md](personal_angle.md)\n- [interview_prep.md](interview_prep.md)\n- [portfolio_matching.md](portfolio_matching.md)\n\n## Links\n- Job URL: ${jobData.job_url}\n- Vault Path: ${jobData.folder_path}\n`;\n\nfs.writeFileSync(`${jobData.folder_path}/tracking.md`, trackingContent);\n\nconst analyticsContent = `# Job Search Analytics\n\n## Overview\n- Total Applications: ${totalApplications}\n- Last Updated: ${jobData.applied_date}\n\n## Recent Application\n- Company: ${jobData.company_name}\n- Position: ${jobData.job_title}\n- Date: ${jobData.applied_date}\n`;\n\nfs.writeFileSync(`${jobData.vault_path}/analytics.md`, analyticsContent);\n\nreturn [{\n  json: {\n    ...jobData,\n    tier5_status: 'complete',\n    total_applications: totalApplications,\n    follow_up_1_date: fu1Date,\n    follow_up_2_date: fu2Date,\n    follow_up_3_date: fu3Date\n  }\n}];"
+      }
+    },
+    {
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-a8b9c0d1e2f3",
+      "name": "Git Commit - job-search-data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const jobData = $input.item.json;\nconst fs = require('fs');\nconst githubToken = process.env.GITHUB_TOKEN || '';\n\nif (!githubToken) {\n  console.log('Warning: GITHUB_TOKEN not set, skipping git commit');\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'skipped'\n    }\n  }];\n}\n\nconst owner = 'odeliyach';\nconst repo = 'job-search-data';\nconst apiBase = 'https://api.github.com';\nconst headers = {\n  'Authorization': `token ${githubToken}`,\n  'Accept': 'application/vnd.github.v3+json',\n  'Content-Type': 'application/json'\n};\n\nasync function apiRequest(method, path, body) {\n  return await $helpers.httpRequest({\n    method: method,\n    url: `${apiBase}${path}`,\n    headers: headers,\n    body: body,\n  });\n}\n\ntry {\n  const refData = await apiRequest('GET', `/repos/${owner}/${repo}/git/refs/heads/main`);\n  const currentSha = refData.object.sha;\n\n  const commitData = await apiRequest('GET', `/repos/${owner}/${repo}/git/commits/${currentSha}`);\n  const treeSha = commitData.tree.sha;\n\n  const filesToCommit = [];\n  const fileNames = [\n    'metadata.md', 'resume.md', 'cover_letter.md',\n    'cold_email.md', 'company_research.md', 'personal_angle.md',\n    'interview_prep.md', 'portfolio_matching.md', 'tracking.md'\n  ];\n\n  for (const fileName of fileNames) {\n    const filePath = `${jobData.folder_path}/${fileName}`;\n    try {\n      const content = fs.readFileSync(filePath, 'utf8');\n      const blobData = await apiRequest('POST', `/repos/${owner}/${repo}/git/blobs`, {\n        content: Buffer.from(content).toString('base64'),\n        encoding: 'base64'\n      });\n      const repoPath = `${jobData.year}/${jobData.month}/${jobData.folder_name}/${fileName}`;\n      filesToCommit.push({ path: repoPath, mode: '100644', type: 'blob', sha: blobData.sha });\n    } catch(e) {\n      console.error(`Error processing file ${fileName}:`, e.message);\n    }\n  }\n\n  try {\n    const analyticsPath = `${jobData.vault_path}/analytics.md`;\n    const analyticsContent = fs.readFileSync(analyticsPath, 'utf8');\n    const analyticsBlobData = await apiRequest('POST', `/repos/${owner}/${repo}/git/blobs`, {\n      content: Buffer.from(analyticsContent).toString('base64'),\n      encoding: 'base64'\n    });\n    filesToCommit.push({ path: 'analytics.md', mode: '100644', type: 'blob', sha: analyticsBlobData.sha });\n  } catch(e) {\n    console.error('Error processing analytics.md:', e.message);\n  }\n\n  const newTreeData = await apiRequest('POST', `/repos/${owner}/${repo}/git/trees`, {\n    base_tree: treeSha,\n    tree: filesToCommit\n  });\n  const newTreeSha = newTreeData.sha;\n\n  const commitMessage = `Job application: ${jobData.company_name} - ${jobData.job_title} - ${jobData.applied_date}`;\n  const newCommitData = await apiRequest('POST', `/repos/${owner}/${repo}/git/commits`, {\n    message: commitMessage,\n    tree: newTreeSha,\n    parents: [currentSha],\n    author: {\n      name: 'Odeliya Charitonova',\n      email: 'odaliya12@gmail.com',\n      date: new Date().toISOString()\n    }\n  });\n  const newCommitSha = newCommitData.sha;\n\n  await apiRequest('PATCH', `/repos/${owner}/${repo}/git/refs/heads/main`, {\n    sha: newCommitSha,\n    force: false\n  });\n\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'success',\n      commit_sha: newCommitSha\n    }\n  }];\n\n} catch(e) {\n  console.error('Git commit failed:', e.message);\n  return [{\n    json: {\n      ...jobData,\n      git_status: 'error',\n      git_error: e.message\n    }\n  }];\n}"
+      }
+    },
+    {
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-b9c0d1e2f3a4",
+      "name": "Send Email Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2900,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credential",
+          "name": "Gmail SMTP"
+        }
+      },
+      "parameters": {
+        "fromEmail": "odeliya.charitonova.dev@gmail.com",
+        "toEmail": "odeliya.charitonova.dev@gmail.com",
+        "subject": "=Job Application Complete: {{ $('Tier 5 - Database & Tracking').item.json.company_name }} - {{ $('Tier 5 - Database & Tracking').item.json.job_title }}",
+        "emailFormat": "html",
+        "html": "=<html><body style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\"><h2 style=\"color: #28a745;\">Application Status: ✅ Complete</h2><hr/><table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px;\"><tr><td style=\"padding: 8px; font-weight: bold; width: 140px;\">Company:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.company_name }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Position:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.job_title }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Location:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.location }}</td></tr><tr><td style=\"padding: 8px; font-weight: bold;\">Applied:</td><td style=\"padding: 8px;\">{{ $('Tier 5 - Database &amp; Tracking').item.json.applied_date }}</td></tr></table><h3>Next Steps:</h3><ul><li>Follow-up reminder: {{ $('Tier 5 - Database &amp; Tracking').item.json.follow_up_1_date }}</li><li>Interview prep materials: Check tracking.md in vault</li><li>Cold outreach: Send intro email within 2-3 days</li></ul><h3>Files Generated:</h3><ul><li>Resume (tailored)</li><li>Cover letter</li><li>Interview prep materials</li><li>Portfolio recommendations</li><li>Cold email templates</li></ul><p><strong>View full details:</strong> /vault/{{ $('Tier 5 - Database &amp; Tracking').item.json.year }}/{{ $('Tier 5 - Database &amp; Tracking').item.json.month }}/{{ $('Tier 5 - Database &amp; Tracking').item.json.folder_name }}/</p><p><strong>Total Applications:</strong> {{ $('Tier 5 - Database &amp; Tracking').item.json.total_applications }}</p></body></html>",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Start Job Application": {
+      "main": [
+        [
+          {
+            "node": "Set Job Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Job Details": {
+      "main": [
+        [
+          {
+            "node": "Parse Job Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Job Info": {
+      "main": [
+        [
+          {
+            "node": "Tier 1 - Core Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tier 1 - Core Application": {
+      "main": [
+        [
+          {
+            "node": "Tier 2 - Cold Outreach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tier 2 - Cold Outreach": {
+      "main": [
+        [
+          {
+            "node": "Tier 3 - Interview Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tier 3 - Interview Prep": {
+      "main": [
+        [
+          {
+            "node": "Tier 4 - Portfolio Matching",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tier 4 - Portfolio Matching": {
+      "main": [
+        [
+          {
+            "node": "Tier 5 - Database & Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tier 5 - Database & Tracking": {
+      "main": [
+        [
+          {
+            "node": "Git Commit - job-search-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Git Commit - job-search-data": {
+      "main": [
+        [
+          {
+            "node": "Send Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
