@@ -7,11 +7,10 @@ This repository contains an N8N workflow for an intelligent job search system th
 
 ```
 job-search-n8n/
+├── Dockerfile                  # Docker image definition for N8N (in root for Render compatibility)
 ├── 📁 config/
 │   ├── docker-compose.yml      # Docker Compose configuration
 │   └── render.yaml             # Render.com deployment configuration
-├── 📁 docker/
-│   └── Dockerfile              # Docker image definition for N8N
 ├── 📁 docs/
 │   ├── SETUP.md                # Setup and installation instructions
 │   ├── USAGE_GUIDE.md          # How to use the system
@@ -82,7 +81,7 @@ job-search-n8n/
 The `config/render.yaml` file contains the Render.com deployment configuration. See [Setup Guide](docs/SETUP.md) for full deployment instructions.
 
 ### Docker
-The `docker/Dockerfile` defines the Docker image. Use `config/docker-compose.yml` for local development with Docker Compose.
+The `Dockerfile` in the root directory defines the Docker image (placed in root for Render compatibility). Use `config/docker-compose.yml` for local development with Docker Compose.
 
 ## AI Prompts
 

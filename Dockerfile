@@ -3,20 +3,15 @@
 # Use the official N8N base image
 FROM n8nio/n8n:latest
 
-# Install dependencies for Ollama integration
-RUN apk add --no-cache <additional-dependencies>
+# Install curl for healthcheck
+RUN apk add --no-cache curl
 
 # Configure for Render environment
 ENV NODE_ENV=production
 ENV N8N_PORT=5678
 
-# Set proper environment variables for N8N
+# Database and other runtime credentials are passed via environment variables at runtime
 ENV DB_TYPE=postgres
-ENV DB_POSTGRESDB_HOST=your-database-host
-ENV DB_POSTGRESDB_PORT=5432
-ENV DB_POSTGRESDB_DATABASE=your-database-name
-ENV DB_POSTGRESDB_USER=your-database-user
-ENV DB_POSTGRESDB_PASSWORD=your-database-password
 
 # Expose port 5678 for N8N
 EXPOSE 5678
