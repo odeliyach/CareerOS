@@ -1,9 +1,32 @@
 # Node.js dependencies
 node_modules/
 
-# Environment variables
+# Environment variables (never commit secrets)
 .env
+.env.local
+.env.production
 
 # Operating System files
 .DS_Store
 Thumbs.db
+*.swp
+*~
+
+# SQLite databases (private data)
+*.db
+*.sqlite
+*.sqlite3
+
+# Private vault data (job applications — goes to job-search-data PRIVATE repo)
+vault/
+.n8n/
+
+# N8N execution data
+.n8n/
+n8n_data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
