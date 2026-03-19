@@ -1,0 +1,202 @@
+{
+  "name": "Follow-up Scheduler - Daily Job Application Check",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "job-search",
+    "follow-up"
+  ],
+  "nodes": [
+    {
+      "id": "daily-trigger-9am",
+      "name": "Daily Trigger - 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fetch-applications",
+      "name": "Fetch Applications from GitHub",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const githubToken = process.env.GITHUB_TOKEN || '';\n\nif (!githubToken) {\n  return [{ json: { applications: [], skip_reason: 'No GITHUB_TOKEN' } }];\n}\n\nconst owner = 'odeliyach';\nconst repo = 'job-search-data';\nconst headers = {\n  'Authorization': 'token ' + githubToken,\n  'Accept': 'application/vnd.github.v3+json'\n};\n\nasync function getFileContent(path) {\n  try {\n    const resp = await $helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + path,\n      headers: headers\n    });\n    return Buffer.from(resp.content, 'base64').toString('utf-8');\n  } catch(e) {\n    return null;\n  }\n}\n\nasync function listFolder(path) {\n  try {\n    const resp = await $helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + path,\n      headers: headers\n    });\n    return Array.isArray(resp) ? resp : [];\n  } catch(e) {\n    return [];\n  }\n}\n\n// Fetch active applications (Job_Applications/Active folder)\nconst activeFiles = await listFolder('Obsidian_Vault/Job_Applications/Active');\nconst waitingFiles = await listFolder('Obsidian_Vault/Job_Applications/Waiting');\nconst allFiles = [...activeFiles, ...waitingFiles];\n\nconst applications = [];\nconst today = new Date();\n\nfor (const file of allFiles) {\n  if (file.type === 'file' && file.name.endsWith('.md') && file.name !== '.gitkeep') {\n    const content = await getFileContent(file.path);\n    if (!content) continue;\n\n    // Parse frontmatter\n    const frontmatterMatch = content.match(/^---([\\s\\S]*?)---/);\n    if (!frontmatterMatch) continue;\n\n    const frontmatter = {};\n    const lines = frontmatterMatch[1].split('\\n');\n    lines.forEach(line => {\n      const match = line.match(/^(\\w+):\\s*(.+)$/);\n      if (match) frontmatter[match[1].trim()] = match[2].trim();\n    });\n\n    const appliedDate = frontmatter.applied_date ? new Date(frontmatter.applied_date) : null;\n    if (!appliedDate) continue;\n\n    const daysSinceApplied = Math.floor((today - appliedDate) / (1000 * 60 * 60 * 24));\n    const status = frontmatter.status || 'applied';\n    const companyName = frontmatter.company || file.name.replace('.md', '');\n    const jobTitle = frontmatter.role || 'Unknown Role';\n\n    // Determine if follow-up is due\n    let followUpDue = false;\n    let followUpType = '';\n\n    if (status === 'applied' && daysSinceApplied === 3) {\n      followUpDue = true;\n      followUpType = 'day_3_application';\n    } else if (status === 'applied' && daysSinceApplied === 7) {\n      followUpDue = true;\n      followUpType = 'day_7_application';\n    } else if (status === 'phone_screen_scheduled') {\n      const phoneScreenDate = frontmatter.phone_screen_date ? new Date(frontmatter.phone_screen_date) : null;\n      if (phoneScreenDate) {\n        const daysSincePhoneScreen = Math.floor((today - phoneScreenDate) / (1000 * 60 * 60 * 24));\n        if (daysSincePhoneScreen === 1) {\n          followUpDue = true;\n          followUpType = 'post_phone_screen';\n        }\n      }\n    } else if (status === 'technical_scheduled') {\n      const technicalDate = frontmatter.technical_date ? new Date(frontmatter.technical_date) : null;\n      if (technicalDate) {\n        const daysSinceTechnical = Math.floor((today - technicalDate) / (1000 * 60 * 60 * 24));\n        if (daysSinceTechnical === 1) {\n          followUpDue = true;\n          followUpType = 'post_technical';\n        }\n      }\n    } else if (status === 'rejected' && daysSinceApplied === 90) {\n      followUpDue = true;\n      followUpType = '90_day_checkin';\n    }\n\n    if (followUpDue) {\n      applications.push({\n        company_name: companyName,\n        job_title: jobTitle,\n        status: status,\n        follow_up_type: followUpType,\n        days_since_applied: daysSinceApplied,\n        applied_date: frontmatter.applied_date,\n        hiring_manager_email: frontmatter.hiring_manager_email || '',\n        file_path: file.path\n      });\n    }\n  }\n}\n\nreturn applications.map(app => ({ json: app }));"
+      }
+    },
+    {
+      "id": "generate-followup-email",
+      "name": "Generate Follow-up Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const appData = $input.item.json;\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false }\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return '[Ollama Error: ' + e.message + ']';\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst followUpType = appData.follow_up_type;\nconst companyName = appData.company_name;\nconst jobTitle = appData.job_title;\n\nlet emailContext = '';\nlet subjectLine = '';\n\nif (followUpType === 'day_3_application') {\n  emailContext = 'This is a 3-day follow-up after submitting an application. Keep it brief (3 sentences). Express continued interest. Ask about timeline.';\n  subjectLine = 'Following up on my application - ' + jobTitle + ' at ' + companyName;\n} else if (followUpType === 'day_7_application') {\n  emailContext = 'This is a 7-day follow-up after submitting an application. Brief (3 sentences). Reiterate one specific reason for interest. Ask if they need more information.';\n  subjectLine = 'Re: ' + jobTitle + ' application - checking in';\n} else if (followUpType === 'post_phone_screen') {\n  emailContext = 'This is a thank-you email sent 24 hours after a phone screen. Express genuine enthusiasm from the conversation. Reference something specific discussed. Ask about next steps.';\n  subjectLine = 'Thank you - ' + jobTitle + ' phone screen at ' + companyName;\n} else if (followUpType === 'post_technical') {\n  emailContext = 'This is a thank-you email sent 24 hours after a technical interview. Express enthusiasm for the technical challenges discussed. Optionally add a brief insight from the technical discussion. Ask about timeline.';\n  subjectLine = 'Thank you - ' + jobTitle + ' technical interview at ' + companyName;\n} else if (followUpType === '90_day_checkin') {\n  emailContext = 'This is an optional 90-day check-in after a rejection. Very brief. Note what you've learned/built since. Express continued interest in the company. Ask if there are relevant openings.';\n  subjectLine = 'Checking in - opportunities at ' + companyName;\n}\n\nconst prompt = 'Write a personalized follow-up email for ' + companyName + ' regarding the ' + jobTitle + ' position. ' + emailContext + ' Sign as Odeliya Charitonova with email odeliya.charitonova.dev@gmail.com. Be authentic and professional, not generic.';\n\nconst emailBody = await callOllama(prompt);\n\nreturn [{\n  json: {\n    ...appData,\n    email_subject: subjectLine,\n    email_body: emailBody,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "notify-followup-pending",
+      "name": "Notify: Follow-up Ready for Approval",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        950,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credential",
+          "name": "Gmail SMTP"
+        }
+      },
+      "parameters": {
+        "fromEmail": "odeliya.charitonova.dev@gmail.com",
+        "toEmail": "odeliya.charitonova.dev@gmail.com",
+        "subject": "\u23f8\ufe0f Follow-up Email Ready - ={{ $json.company_name }} (={{ $json.follow_up_type }})",
+        "emailFormat": "html",
+        "html": "<h2>Follow-up Email Ready for Approval</h2><p><strong>Company:</strong> ={{ $json.company_name }}</p><p><strong>Role:</strong> ={{ $json.job_title }}</p><p><strong>Type:</strong> ={{ $json.follow_up_type }}</p><p><strong>Days Since Applied:</strong> ={{ $json.days_since_applied }}</p><hr><h3>Proposed Email:</h3><p><strong>Subject:</strong> ={{ $json.email_subject }}</p><p><strong>To:</strong> ={{ $json.hiring_manager_email }}</p><hr><pre>={{ $json.email_body }}</pre><hr><h3>Actions:</h3><p>Go to N8N and click <strong>'Resume'</strong> to approve and send.</p><p>Click <strong>'Stop'</strong> to discard this follow-up.</p><p><strong>\u26a0\ufe0f IMPORTANT:</strong> Every follow-up requires your manual approval. Nothing is sent automatically.</p>"
+      }
+    },
+    {
+      "id": "manual-approval-followup",
+      "name": "Manual Approval - Follow-up Email",
+      "type": "n8n-nodes-base.pause",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "resume": true
+      }
+    },
+    {
+      "id": "send-followup-email",
+      "name": "Send Follow-up Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1450,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credential",
+          "name": "Gmail SMTP"
+        }
+      },
+      "parameters": {
+        "fromEmail": "odeliya.charitonova.dev@gmail.com",
+        "toEmail": "={{ $json.hiring_manager_email }}",
+        "subject": "={{ $json.email_subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.email_body }}"
+      }
+    },
+    {
+      "id": "update-communication-log",
+      "name": "Update Communication Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const appData = $input.item.json;\nconst githubToken = process.env.GITHUB_TOKEN || '';\n\nif (!githubToken) {\n  return [{ json: { ...appData, log_status: 'skipped' } }];\n}\n\nconst owner = 'odeliyach';\nconst repo = 'job-search-data';\nconst headers = {\n  'Authorization': 'token ' + githubToken,\n  'Accept': 'application/vnd.github.v3+json',\n  'Content-Type': 'application/json'\n};\n\nasync function apiRequest(method, path, body) {\n  return await $helpers.httpRequest({\n    method: method,\n    url: 'https://api.github.com' + path,\n    headers: headers,\n    body: body\n  });\n}\n\ntry {\n  // Get current file content\n  let existingContent = '';\n  let existingFileSha = null;\n\n  const logPath = appData.file_path ? appData.file_path.replace('.md', '-communication-log.md') :\n    'Obsidian_Vault/Job_Applications/Active/' + appData.company_name + '-communication-log.md';\n\n  try {\n    const fileData = await apiRequest('GET', '/repos/' + owner + '/' + repo + '/contents/' + logPath);\n    existingContent = Buffer.from(fileData.content, 'base64').toString('utf-8');\n    existingFileSha = fileData.sha;\n  } catch(e) {\n    existingContent = '# Communication Log - ' + appData.company_name + '\\n\\n';\n  }\n\n  // Append new log entry\n  const today = new Date().toISOString().split('T')[0];\n  const logEntry = '- **' + today + '** | Sent: ' + appData.follow_up_type.replace(/_/g, ' ') + ' follow-up | Subject: ' + appData.email_subject + '\\n';\n  const updatedContent = existingContent + logEntry;\n\n  // Commit the update\n  const updateBody = {\n    message: 'Update communication log: ' + appData.company_name + ' ' + appData.follow_up_type,\n    content: Buffer.from(updatedContent).toString('base64'),\n    branch: 'main'\n  };\n  if (existingFileSha) updateBody.sha = existingFileSha;\n\n  await apiRequest('PUT', '/repos/' + owner + '/' + repo + '/contents/' + logPath, updateBody);\n\n  return [{ json: { ...appData, log_status: 'updated', log_path: logPath } }];\n} catch(e) {\n  console.error('Error updating communication log:', e.message);\n  return [{ json: { ...appData, log_status: 'error', log_error: e.message } }];\n}"
+      }
+    }
+  ],
+  "connections": {
+    "Daily Trigger - 9 AM": {
+      "main": [
+        [
+          {
+            "node": "Fetch Applications from GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Applications from GitHub": {
+      "main": [
+        [
+          {
+            "node": "Generate Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Notify: Follow-up Ready for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: Follow-up Ready for Approval": {
+      "main": [
+        [
+          {
+            "node": "Manual Approval - Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Approval - Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Update Communication Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

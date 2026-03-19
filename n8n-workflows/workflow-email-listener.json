@@ -1,0 +1,274 @@
+{
+  "name": "Email Listener - Job Application Tracker",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "job-search",
+    "email-tracking"
+  ],
+  "nodes": [
+    {
+      "id": "email-trigger-schedule",
+      "name": "Schedule Trigger - Every 30min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gmail-read-emails",
+      "name": "Read Gmail - Job Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-credential",
+          "name": "Gmail OAuth2"
+        }
+      },
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "q": "subject:(application OR interview OR offer OR rejection OR position OR opportunity OR hiring) newer_than:1d"
+        },
+        "limit": 50
+      }
+    },
+    {
+      "id": "classify-email",
+      "name": "Classify Email Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const email = $input.item.json;\nconst subject = (email.subject || '').toLowerCase();\nconst body = (email.text || email.snippet || '').toLowerCase();\nconst fullText = subject + ' ' + body;\n\nlet emailType = 'unknown';\nlet status = 'unknown';\n\n// Detect rejection\nif (fullText.includes('unfortunately') || fullText.includes('not moving forward') ||\n    fullText.includes('decided to proceed with other') || fullText.includes('not selected') ||\n    fullText.includes('not a match') || fullText.includes('position has been filled') ||\n    fullText.includes('we regret') || fullText.includes('other candidates')) {\n  emailType = 'rejection';\n  status = 'rejected';\n}\n// Detect offer\nelse if (fullText.includes('offer') && (fullText.includes('pleased') || fullText.includes('excited') ||\n    fullText.includes('compensation') || fullText.includes('salary') || fullText.includes('start date'))) {\n  emailType = 'offer';\n  status = 'offer_received';\n}\n// Detect final interview\nelse if ((fullText.includes('final') || fullText.includes('last')) &&\n    (fullText.includes('interview') || fullText.includes('round'))) {\n  emailType = 'final_interview';\n  status = 'final_round_scheduled';\n}\n// Detect technical interview\nelse if (fullText.includes('technical') && fullText.includes('interview')) {\n  emailType = 'technical_interview';\n  status = 'technical_scheduled';\n}\n// Detect phone screen\nelse if ((fullText.includes('phone') || fullText.includes('call') || fullText.includes('screening')) &&\n    (fullText.includes('schedule') || fullText.includes('interview') || fullText.includes('chat'))) {\n  emailType = 'phone_screen';\n  status = 'phone_screen_scheduled';\n}\n// Detect moving forward\nelse if (fullText.includes('moving forward') || fullText.includes('next steps') ||\n    fullText.includes('next round') || fullText.includes('advance')) {\n  emailType = 'moving_forward';\n  status = 'phone_screen_scheduled';\n}\n\n// Extract company name from email sender or subject\nconst senderEmail = (email.from || '').toLowerCase();\nconst senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1].split('.')[0] : '';\n\nreturn [{\n  json: {\n    ...email,\n    email_type: emailType,\n    new_status: status,\n    sender_company: senderDomain,\n    processed_at: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "filter-known-emails",
+      "name": "Filter - Skip Unknown",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        950,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-not-unknown",
+              "leftValue": "={{ $json.email_type }}",
+              "rightValue": "unknown",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "update-obsidian-status",
+      "name": "Update Obsidian & GitHub Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const emailData = $input.item.json;\nconst githubToken = process.env.GITHUB_TOKEN || '';\n\nif (!githubToken) {\n  return [{\n    json: {\n      ...emailData,\n      update_status: 'skipped',\n      skip_reason: 'No GITHUB_TOKEN'\n    }\n  }];\n}\n\nconst owner = 'odeliyach';\nconst repo = 'job-search-data';\nconst apiBase = 'https://api.github.com';\nconst headers = {\n  'Authorization': 'token ' + githubToken,\n  'Accept': 'application/vnd.github.v3+json',\n  'Content-Type': 'application/json'\n};\n\nasync function apiRequest(method, path, body) {\n  return await $helpers.httpRequest({\n    method: method,\n    url: apiBase + path,\n    headers: headers,\n    body: body\n  });\n}\n\n// Determine target folder based on new status\nfunction getTargetFolder(status) {\n  const folderMap = {\n    'applied': 'Job_Applications/Active',\n    'phone_screen_scheduled': 'Job_Applications/Waiting',\n    'technical_scheduled': 'Job_Applications/Waiting',\n    'final_round_scheduled': 'Job_Applications/Waiting',\n    'offer_received': 'Job_Applications/Offers',\n    'rejected': 'Job_Applications/Rejected'\n  };\n  return folderMap[status] || 'Job_Applications/Active';\n}\n\n// Ensure folder exists by creating .gitkeep if needed\nasync function ensureFolderExists(folderPath) {\n  try {\n    const gitkeepPath = 'Obsidian_Vault/' + folderPath + '/.gitkeep';\n    await apiRequest('GET', '/repos/' + owner + '/' + repo + '/contents/' + gitkeepPath);\n  } catch(e) {\n    // Folder doesn't exist, create .gitkeep\n    try {\n      const refData = await apiRequest('GET', '/repos/' + owner + '/' + repo + '/git/refs/heads/main');\n      const currentSha = refData.object.sha;\n      const commitData = await apiRequest('GET', '/repos/' + owner + '/' + repo + '/git/commits/' + currentSha);\n      const treeSha = commitData.tree.sha;\n\n      const blobData = await apiRequest('POST', '/repos/' + owner + '/' + repo + '/git/blobs', {\n        content: '',\n        encoding: 'utf-8'\n      });\n\n      const newTreeData = await apiRequest('POST', '/repos/' + owner + '/' + repo + '/git/trees', {\n        base_tree: treeSha,\n        tree: [{ path: 'Obsidian_Vault/' + folderPath + '/.gitkeep', mode: '100644', type: 'blob', sha: blobData.sha }]\n      });\n\n      const newCommitData = await apiRequest('POST', '/repos/' + owner + '/' + repo + '/git/commits', {\n        message: 'Auto-create folder: ' + folderPath,\n        tree: newTreeData.sha,\n        parents: [currentSha]\n      });\n\n      await apiRequest('PATCH', '/repos/' + owner + '/' + repo + '/git/refs/heads/main', {\n        sha: newCommitData.sha,\n        force: false\n      });\n    } catch(createErr) {\n      console.error('Error creating folder ' + folderPath + ':', createErr.message);\n    }\n  }\n}\n\nconst newStatus = emailData.new_status;\nconst targetFolder = getTargetFolder(newStatus);\nawait ensureFolderExists(targetFolder);\n\n// Log entry for communication log\nconst logEntry = '- **' + new Date().toISOString().split('T')[0] + '** | ' +\n  emailData.email_type.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase()) + ' | ' +\n  'From: ' + (emailData.from || 'Unknown') + '\\n';\n\nreturn [{\n  json: {\n    ...emailData,\n    target_folder: targetFolder,\n    log_entry: logEntry,\n    update_status: 'processed'\n  }\n}];"
+      }
+    },
+    {
+      "id": "generate-rejection-response",
+      "name": "Generate Rejection Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        500
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const emailData = $input.item.json;\n\n// Only generate response for rejections\nif (emailData.email_type !== 'rejection') {\n  return [{ json: { ...emailData, skip_response: true } }];\n}\n\nasync function callOllama(prompt) {\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      const resp = await $helpers.httpRequest({\n        method: 'POST',\n        url: 'http://ollama:11434/api/generate',\n        headers: { 'Content-Type': 'application/json' },\n        body: { model: 'llama3.2', prompt: prompt, stream: false }\n      });\n      return (resp && resp.response) ? resp.response : '[No response]';\n    } catch (e) {\n      if (attempt === 3) return '[Ollama Error: ' + e.message + ']';\n      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));\n    }\n  }\n}\n\nconst rejectionStage = emailData.rejection_stage || 'phone_screen';\nconst companyName = emailData.sender_company || 'the company';\n\nlet templateContext = '';\nif (rejectionStage === 'phone_screen') {\n  templateContext = 'This was rejected after a phone screen (minimal investment from both sides). Keep response brief and professional.';\n} else if (rejectionStage === 'technical') {\n  templateContext = 'This was rejected after a technical interview. Show appreciation for the technical depth of the process. Request specific technical feedback.';\n} else if (rejectionStage === 'final_round') {\n  templateContext = 'This was rejected after the final round. The company invested significant time. Response should be warmer and more personal. Express genuine gratitude.';\n}\n\nconst prompt = 'Write a professional rejection response email to ' + companyName + ' for a ' + emailData.email_type + ' at the ' + rejectionStage + ' stage. ' + templateContext + ' The email should: 1) Thank them professionally 2) Request feedback 3) Keep the door open for future opportunities 4) Be genuine, not bitter. Keep it to 3-4 short paragraphs. Sign as Odeliya Charitonova.';\n\nconst responseEmail = await callOllama(prompt);\n\nreturn [{\n  json: {\n    ...emailData,\n    rejection_response_draft: responseEmail,\n    rejection_stage: rejectionStage,\n    skip_response: false\n  }\n}];"
+      }
+    },
+    {
+      "id": "notify-rejection-approval",
+      "name": "Notify: Rejection Response Ready",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1450,
+        500
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credential",
+          "name": "Gmail SMTP"
+        }
+      },
+      "parameters": {
+        "fromEmail": "odeliya.charitonova.dev@gmail.com",
+        "toEmail": "odeliya.charitonova.dev@gmail.com",
+        "subject": "\u23f8\ufe0f Rejection Response Ready for Approval",
+        "emailFormat": "html",
+        "html": "<h2>Rejection Response Ready</h2><p>A rejection email from <strong>={{ $json.sender_company }}</strong> has been received and a response has been drafted.</p><p><strong>Stage:</strong> ={{ $json.rejection_stage }}</p><hr><h3>Drafted Response:</h3><pre>={{ $json.rejection_response_draft }}</pre><hr><h3>Next Step:</h3><p>Go to N8N and click <strong>'Resume'</strong> to approve and send this response.</p><p>Or click <strong>'Stop'</strong> to discard.</p>"
+      }
+    },
+    {
+      "id": "approve-rejection-response",
+      "name": "Manual Approval - Rejection Response",
+      "type": "n8n-nodes-base.pause",
+      "typeVersion": 1,
+      "position": [
+        1700,
+        500
+      ],
+      "parameters": {
+        "resume": true
+      }
+    },
+    {
+      "id": "send-rejection-response",
+      "name": "Send Rejection Response",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1950,
+        500
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credential",
+          "name": "Gmail SMTP"
+        }
+      },
+      "parameters": {
+        "fromEmail": "odeliya.charitonova.dev@gmail.com",
+        "toEmail": "={{ $json.from }}",
+        "subject": "Re: ={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.rejection_response_draft }}"
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger - Every 30min": {
+      "main": [
+        [
+          {
+            "node": "Read Gmail - Job Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Gmail - Job Emails": {
+      "main": [
+        [
+          {
+            "node": "Classify Email Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Email Type": {
+      "main": [
+        [
+          {
+            "node": "Filter - Skip Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter - Skip Unknown": {
+      "main": [
+        [
+          {
+            "node": "Update Obsidian & GitHub Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Rejection Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Rejection Response": {
+      "main": [
+        [
+          {
+            "node": "Notify: Rejection Response Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: Rejection Response Ready": {
+      "main": [
+        [
+          {
+            "node": "Manual Approval - Rejection Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Approval - Rejection Response": {
+      "main": [
+        [
+          {
+            "node": "Send Rejection Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
