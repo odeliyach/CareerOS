@@ -429,10 +429,62 @@ You are a **job search strategist and data analyst** helping me track and optimi
    - If rejected: (optional) Ask for feedback
 
 3. **Follow-Up Message Templates:**
-   - "It's been a week..." (gentle reminder)
-   - "Thanks for the great conversation" (immediately after)
-   - "Any updates on next steps?" (after technical round)
-   - "Quick follow-up on timeline" (before final decision)
+  ### "It's been a week..." (Day 7 — no response yet)
+
+> I came across [specific thing Company did recently — product launch, engineering blog post, open source release].
+> My work on [most relevant project from CV — picked by AI based on role] maps directly to the kind of problem you're solving there.
+> Is the [Role] position still active, and would it make sense to connect?
+>
+> Odeliya Charitonova
+
+*Why this works: opens with proof you did research, connects your work to theirs specifically, asks a direct yes/no question that's easy to answer.*
+
+---
+
+### "Thanks for the great conversation" (immediately after phone/interview)
+
+> Really enjoyed our conversation today — [one specific technical topic you discussed] was genuinely interesting to think through.
+> I looked into [something they mentioned] afterward and [one relevant observation or connection to your own work].
+> Looking forward to hearing about next steps.
+>
+> Odeliya Charitonova
+
+*Why this works: proves you were paying attention, shows intellectual engagement, doesn't ask for anything — just moves forward.*
+
+---
+
+### "Any updates on next steps?" (Day 30 / after technical round)
+
+> It's been a few weeks since we spoke — I wanted to check in and confirm my interest in the [Role] position is unchanged.
+> [One specific thing about Company's engineering culture or tech stack that genuinely appeals to you — be specific.]
+> Is there any update on the timeline, or are there similar openings on the team?
+>
+> Odeliya Charitonova
+
+*Why this works: acknowledges time without being apologetic, shows you've thought about them specifically, gives them an easy out (similar roles) if this one closed.*
+
+---
+
+### "Quick follow-up on timeline" (before final decision / Day 7 post-final)
+
+> I wanted to follow up ahead of your decision on [Role].
+> Since our last conversation, [one concrete thing — a project update, something you shipped, a relevant skill you deepened]. Happy to share more if useful.
+> What's the current timeline looking like?
+>
+> Odeliya Charitonova
+
+*Why this works: shows you've been active, not just waiting — adds new information rather than just asking "any news?", and asks a specific question.*
+
+---
+
+### Notes on all templates
+
+- Every email references something **specific and real** about the company — never generic admiration
+- Every email mentions **one project with a concrete detail** — not "my experience in X" but "my work on Y which achieved Z"
+- Keep to 3 sentences maximum — recruiters skim, not read
+- The AI in the scheduler picks the most relevant project from your CV automatically for each role
+- Banned phrases in all templates: "excited", "passionate about", "would love the opportunity", "looking forward to hearing from you"
+
 
 4. **Analytics Dashboard - What Matters:**
    - Applications submitted (weekly/monthly)
