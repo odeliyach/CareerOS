@@ -10,6 +10,7 @@
 [![n8n](https://img.shields.io/badge/n8n-Workflow_Automation-EF6C00?style=flat-square&logo=n8n)](https://n8n.io)
 [![Groq](https://img.shields.io/badge/Groq-LLaMA_3.1-F55036?style=flat-square)](https://groq.com)
 [![GitHub](https://img.shields.io/badge/Data_Store-GitHub_API-181717?style=flat-square&logo=github)](https://github.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
