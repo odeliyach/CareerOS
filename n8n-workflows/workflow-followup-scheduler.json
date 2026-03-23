@@ -1,58 +1,156 @@
 {
   "name": "Job Search - Follow-Up Scheduler",
-  "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "pinData": {},
-  "tags": [],
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
   "nodes": [
     {
-      "id": "bb200001-cc22-4dd2-ee22-ff2200001111",
-      "name": "Daily 9 AM Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1,
-      "position": [
-        200,
-        300
-      ],
       "parameters": {
-        "rule": {
-          "interval": [
+        "url": "https://api.github.com/repos/odeliyach/job-search-data/contents/cv.md",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
             {
-              "field": "cronExpression",
-              "expression": "0 9 * * *"
+              "name": "Accept",
+              "value": "application/vnd.github.v3.raw"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-search"
             }
           ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "2ce09cec-215a-428f-9127-ab940199d4a4",
+      "name": "Fetch CV from GitHub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        496,
+        176
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nriQcBdVr3dXV5me",
+          "name": "Header Auth account"
         }
       }
     },
     {
-      "id": "bb200002-cc22-4dd2-ee22-ff2200002222",
-      "name": "Check Follow-Up Schedule",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        500,
-        300
-      ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "// Check which applications need follow-ups today\nconst githubToken = process.env.GITHUB_TOKEN || '';\nconst today = new Date().toISOString().split('T')[0];\n\nif (!githubToken) {\n  return [{ json: { followups_needed: [], error: 'No GitHub token' } }];\n}\n\nconst owner = 'odeliyach';\nconst repo = 'job-search-data';\nconst headers = {\n  'Authorization': 'token ' + githubToken,\n  'Accept': 'application/vnd.github.v3+json'\n};\n\ntry {\n  // Get the tracking files from the vault Active folder\n  let trackingFiles = [];\n  try {\n    const contentsResp = await $helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/Obsidian_Vault/Active',\n      headers: headers\n    });\n    // Look through each year/month/company folder for tracking.md files\n    if (Array.isArray(contentsResp)) {\n      for (const yearDir of contentsResp) {\n        if (yearDir.type === 'dir') {\n          try {\n            const monthDirs = await $helpers.httpRequest({\n              method: 'GET',\n              url: 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + yearDir.path,\n              headers: headers\n            });\n            for (const monthDir of monthDirs) {\n              if (monthDir.type === 'dir') {\n                try {\n                  const appDirs = await $helpers.httpRequest({\n                    method: 'GET',\n                    url: 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + monthDir.path,\n                    headers: headers\n                  });\n                  for (const appDir of appDirs) {\n                    if (appDir.type === 'dir') {\n                      trackingFiles.push(appDir.path + '/tracking.md');\n                    }\n                  }\n                } catch (e) { /* skip */ }\n              }\n            }\n          } catch (e) { /* skip */ }\n        }\n      }\n    }\n  } catch (e) {\n    // Vault may not exist yet\n    trackingFiles = [];\n  }\n\n  const followupsNeeded = [];\n\n  // Check each tracking file for due dates\n  for (const filePath of trackingFiles) {\n    try {\n      const fileResp = await $helpers.httpRequest({\n        method: 'GET',\n        url: 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + filePath,\n        headers: headers\n      });\n      const content = Buffer.from(fileResp.content, 'base64').toString('utf-8');\n\n      // Parse follow-up dates from tracking.md\n      const day3Match = content.match(/Day 3 check-in: (\\d{4}-\\d{2}-\\d{2})/);\n      const day7Match = content.match(/Day 7 follow-up: (\\d{4}-\\d{2}-\\d{2})/);\n      const day30Match = content.match(/Day 30 check-in: (\\d{4}-\\d{2}-\\d{2})/);\n      const day90Match = content.match(/90-day check-in: (\\d{4}-\\d{2}-\\d{2})/);\n      const companyMatch = content.match(/Company: ([^\\n]+)/);\n      const titleMatch = content.match(/Title: ([^\\n]+)/);\n\n      const company = companyMatch ? companyMatch[1].trim() : filePath;\n      const title = titleMatch ? titleMatch[1].trim() : 'Position';\n\n      const checks = [\n        { date: day3Match ? day3Match[1] : null, type: 'day_3', label: 'Day 3 Check-In' },\n        { date: day7Match ? day7Match[1] : null, type: 'day_7', label: 'Day 7 Follow-Up' },\n        { date: day30Match ? day30Match[1] : null, type: 'day_30', label: 'Day 30 Check-In' },\n        { date: day90Match ? day90Match[1] : null, type: 'day_90', label: '90-Day Check-In' }\n      ];\n\n      for (const check of checks) {\n        if (check.date === today) {\n          followupsNeeded.push({\n            company: company,\n            title: title,\n            followup_type: check.type,\n            followup_label: check.label,\n            due_date: today,\n            file_path: filePath\n          });\n        }\n      }\n    } catch (e) { /* skip */ }\n  }\n\n  return [{ json: { followups_needed: followupsNeeded, checked_date: today, files_checked: trackingFiles.length } }];\n\n} catch (e) {\n  return [{ json: { followups_needed: [], error: e.message } }];\n}\n"
+        "url": "=https://api.github.com/repos/odeliyach/job-search-data/contents/Job_Applications/Active",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-search"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "779bdaaf-ba24-4eb4-926f-30a01b89bf83",
+      "name": "Fetch Active Applications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        496,
+        176
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nriQcBdVr3dXV5me",
+          "name": "Header Auth account"
+        }
       }
     },
     {
-      "id": "bb200003-cc22-4dd2-ee22-ff2200003333",
-      "name": "Any Follow-Ups Today?",
-      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "jsCode": "// WHY $input.all() instead of $input.first():\n// GitHub Contents API returns one n8n item per file, not a single item\n// containing an array. So we collect all items and map them directly.\nconst items = $input.all();\nconst today = new Date().toISOString().split('T')[0];\n\nif (items.length === 0) {\n  return [];\n}\n\nconst mdFiles = items\n  .map(i => i.json)\n  .filter(f => f.type === 'file' && f.name && f.name.endsWith('.md'));\n\nif (mdFiles.length === 0) {\n  return [];\n}\n\nreturn mdFiles.map(f => ({ json: {\n  file_url: f.url,\n  file_name: f.name,\n  checked_date: today\n} }));\n"
+      },
+      "id": "97b939a6-84e8-4537-9aab-d4bf65e3a18e",
+      "name": "List Application Files",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        800,
-        300
+        704,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.file_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-search"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "b6f5fcc6-0a62-4d3d-a1f1-b51549a5111f",
+      "name": "Fetch File Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        896,
+        176
       ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nriQcBdVr3dXV5me",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst today = new Date().toISOString().split('T')[0];\nconst followupsNeeded = [];\n\nfor (const item of items) {\n  try {\n    const content = Buffer.from(item.json.content || '', 'base64').toString('utf-8');\n\n    const companyMatch = content.match(/^company:\\s*\"?([^\"\\n]+)\"?/m);\n    const roleMatch    = content.match(/^role:\\s*\"?([^\"\\n]+)\"?/m);\n    const company = companyMatch ? companyMatch[1].trim() : 'Unknown';\n    const role    = roleMatch    ? roleMatch[1].trim()    : 'Position';\n\n    // WHY split on | and trim: dates are in a markdown table:\n    // | Day 3 | 2026-03-23 | ⏳ Pending |\n    // Split the line by | gives ['', ' Day 3 ', ' 2026-03-23 ', ' ⏳ Pending ', '']\n    function extractDate(text, label) {\n      const line = text.split('\\n').find(l => l.includes(label));\n      if (!line) return null;\n      const parts = line.split('|').map(p => p.trim());\n      const datePart = parts.find(p => /^\\d{4}-\\d{2}-\\d{2}$/.test(p));\n      return datePart || null;\n    }\n\n    const checks = [\n      { date: extractDate(content, 'Day 3'),  type: 'day_3',  label: 'Day 3 Check-In' },\n      { date: extractDate(content, 'Day 7'),  type: 'day_7',  label: 'Day 7 Follow-Up' },\n      { date: extractDate(content, 'Day 30'), type: 'day_30', label: 'Day 30 Check-In' },\n      { date: extractDate(content, 'Day 90'), type: 'day_90', label: '90-Day Check-In' }\n    ];\n\n    // Filter by today's date — only process follow-ups due today\n    for (const check of checks) {\n      if (check.date === today) {\n        followupsNeeded.push({ company, role, followup_type: check.type, followup_label: check.label, due_date: check.date });\n      }\n    }\n  } catch(e) { /* skip */ }\n}\n\n\n// WHY read from Fetch CV from GitHub's input chain: the Set Type node ran before\n// Fetch CV from GitHub, so its output is available via $('Set Type day_3') etc.\n// But since we don't know which trigger fired, we read it from the first item\n// that came through — it was injected by whichever Set Type node ran.\n// Actually the cleanest way: pass it through Fetch CV node by reading $input context.\n// Since Set Type connects to Fetch CV which connects here, we can't directly read it.\n// Instead, we use a simpler approach: read the current hour to determine type.\n// 9:00-9:29 = day_3, 9:30-9:59 = day_7, 10:00-10:29 = day_30, 10:30+ = day_90\nconst now = new Date();\nconst hour = now.getHours();\nconst minute = now.getMinutes();\nlet typeFilter = null;\nif (hour === 9 && minute < 30) typeFilter = 'day_3';\nelse if (hour === 9 && minute >= 30) typeFilter = 'day_7';\nelse if (hour === 10 && minute < 30) typeFilter = 'day_30';\nelse if (hour === 10 && minute >= 30) typeFilter = 'day_90';\nif (typeFilter) {\n  followupsNeeded = followupsNeeded.filter(f => f.followup_type === typeFilter);\n}\nreturn [{ json: { followups_needed: followupsNeeded, checked_date: today, files_checked: items.length } }];\n"
+      },
+      "id": "b9970f96-7172-44a0-ba79-811dcc5bd20a",
+      "name": "Parse Follow-Up Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        176
+      ]
+    },
+    {
       "parameters": {
         "conditions": {
           "options": {
@@ -69,75 +167,131 @@
             }
           ],
           "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4b778365-3326-4346-9d09-33ef5b97a729",
+      "name": "Any Follow-Ups Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst followups = data.followups_needed || [];\n\n// WHY read CV by node name: the CV was fetched at the start of the workflow\n// so the AI can pick the most relevant projects for this specific role,\n// rather than us hardcoding a fixed list.\nconst cvText = $('Fetch CV from GitHub').first().json || '';\nconst cvString = typeof cvText === 'string' ? cvText.substring(0, 1500) : JSON.stringify(cvText).substring(0, 1500);\n\nreturn followups.map(f => {\n  let prompt = '';\n\n  if (f.followup_type === 'day_3') {\n    prompt =\n      'Write a follow-up email to a recruiter at ' + f.company + ' for the ' + f.role + ' position. ' +\n      'It has been 3 days since I applied. Tone: confident, concise, not desperate. Maximum 4 sentences. ' +\n      'Rules: ' +\n      '1. Open with ONE specific, recent (2025-2026) thing ' + f.company + ' has done -- a product launch, technical achievement, or engineering decision. Be specific, not vague. ' +\n      '2. From my CV below, pick the ONE project most relevant to ' + f.role + ' at ' + f.company + ' and reference it with a specific metric or technical detail. ' +\n      '3. Ask about next steps. ' +\n      '4. Banned phrases: excited to apply, passionate about, would love the opportunity, looking forward to hearing from you. ' +\n      '5. Sound like a peer, not a job seeker. ' +\n      '6. After the main email, write 2 alternative versions with different opening hooks but same structure. ' +\n      '7. Add a short note: what makes each version likely to get a response. ' +\n      'Sign off: Odeliya Charitonova\\n\\nMy CV:\\n' + cvString;\n  } else if (f.followup_type === 'day_7') {\n    prompt =\n      'Write a 7-day follow-up email to a recruiter at ' + f.company + ' for the ' + f.role + ' position. ' +\n      'No response yet. Tone: self-assured, brief. Maximum 4 sentences. ' +\n      'Rules: ' +\n      '1. From my CV below, pick the ONE project most relevant to ' + f.role + ' and mention one specific technical detail or metric that proves I can do this job. ' +\n      '2. Reference something technically specific about ' + f.company + ' -- a system they run at scale, a technical blog post, or a recent engineering decision. ' +\n      '3. Ask directly: is the role still active, and would it make sense to connect? ' +\n      '4. Banned phrases: excited, passionate, would love, looking forward. Sound like someone with options, not someone waiting by the phone. ' +\n      '5. After the main email, write 2 alternative versions with different hooks. ' +\n      '6. Add a note on what makes each version likely to get a response. ' +\n      'Sign off: Odeliya Charitonova\\n\\nMy CV:\\n' + cvString;\n  } else if (f.followup_type === 'day_30') {\n    prompt =\n      'Write a 30-day check-in email to a recruiter at ' + f.company + ' for the ' + f.role + ' position. ' +\n      'Tone: warm but direct. 3 sentences maximum. ' +\n      'Rules: ' +\n      '1. From my CV below, pick the most impressive project relevant to ' + f.role + ' and mention it with a specific detail. ' +\n      '2. Reference one real thing about ' + f.company + '\\'s engineering culture or tech that genuinely appeals. ' +\n      '3. Ask if the role is still active or if there are similar openings. ' +\n      '4. No filler, no desperation. ' +\n      '5. Write 2 alternative versions with different hooks, plus a note on what makes each effective. ' +\n      'Sign off: Odeliya Charitonova\\n\\nMy CV:\\n' + cvString;\n  } else {\n    prompt =\n      'Write a 90-day reconnection email to someone at ' + f.company + ' for the ' + f.role + ' position. ' +\n      'Tone: confident and curious, not desperate. 3 sentences maximum. ' +\n      'Rules: ' +\n      '1. Do not mention the rejection or the wait. Reconnect naturally. ' +\n      '2. From my CV below, lead with the most impressive project relevant to ' + f.role + ' -- pick based on relevance, not recency. ' +\n      '3. Ask if there are openings that might fit, or if they would be open to a quick conversation. ' +\n      '4. Sound like someone who has grown, not someone still waiting. ' +\n      '5. Write 2 alternative versions plus notes on effectiveness. ' +\n      'Sign off: Odeliya Charitonova\\n\\nMy CV:\\n' + cvString;\n  }\n\n  return { json: {\n    company: f.company,\n    role: f.role,\n    followup_type: f.followup_type,\n    followup_label: f.followup_label,\n    due_date: f.due_date,\n    body: JSON.stringify({\n      model: 'llama-3.1-8b-instant',\n      messages: [{ role: 'user', content: prompt }],\n      temperature: 0.85,\n      max_tokens: 512\n    })\n  } };\n});\n"
+      },
+      "id": "f14b87f5-2570-426d-ab9f-5e4d43bd2272",
+      "name": "Prepare Follow-Up Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "cfd063c7-f0ed-4b33-87b7-6f692412c4f8",
+      "name": "Generate Email Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1712,
+        64
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EV5TtLlrpZapy6WQ",
+          "name": "Header Auth account 2"
         }
       }
     },
     {
-      "id": "bb200004-cc22-4dd2-ee22-ff2200004444",
-      "name": "Generate Follow-Up Emails",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1100,
-        200
-      ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "// Generate follow-up messages for each application needing follow-up\nconst data = $input.item.json;\nconst followups = data.followups_needed || [];\n\nif (followups.length === 0) {\n  return [{ json: { message: 'No follow-ups needed today', date: data.checked_date } }];\n}\n\nasync function callOllama(prompt) {\n  try {\n    const resp = await $helpers.httpRequest({\n      method: 'POST',\n      url: 'http://ollama:11434/api/generate',\n      headers: { 'Content-Type': 'application/json' },\n      body: { model: 'llama3.2', prompt: prompt, stream: false }\n    });\n    return (resp && resp.response) ? resp.response : '[No response]';\n  } catch (e) {\n    return '[Ollama Error: ' + e.message + ']';\n  }\n}\n\nconst results = [];\n\nfor (const followup of followups) {\n  let prompt = '';\n\n  if (followup.followup_type === 'day_3') {\n    prompt =\n      'Write a brief, professional follow-up email for ' + followup.company + ' ' + followup.title + ' position.\\n' +\n      'This is a Day 3 check-in - it has been 3 days since applying.\\n' +\n      'Keep it under 3 sentences. Show continued interest. Reference something specific about the company.\\n' +\n      'Be friendly and professional. Not pushy.\\n' +\n      'Subject line: Following up on ' + followup.title + ' Application';\n  } else if (followup.followup_type === 'day_7') {\n    prompt =\n      'Write a follow-up email for ' + followup.company + ' ' + followup.title + ' position.\\n' +\n      'It has been 7 days since applying - no response yet.\\n' +\n      'Keep it under 4 sentences. Reiterate interest. Mention a specific skill or achievement relevant to them.\\n' +\n      'Ask if they need any additional information. Show initiative without being desperate.\\n' +\n      'Subject line: Re: ' + followup.title + ' Application - Following Up';\n  } else if (followup.followup_type === 'post_phone') {\n    prompt =\n      'Write a thank you and follow-up email after a phone screen for ' + followup.company + ' ' + followup.title + '.\\n' +\n      'Send within 24 hours of the call.\\n' +\n      'Thank them for their time. Reference ONE specific topic from the conversation.\\n' +\n      'Reaffirm your interest and ask about next steps timeline.\\n' +\n      'Subject line: Thank You - ' + followup.title + ' Phone Interview';\n  } else if (followup.followup_type === 'post_technical') {\n    prompt =\n      'Write a thank you email after a technical interview for ' + followup.company + ' ' + followup.title + '.\\n' +\n      'Send within 24 hours.\\n' +\n      'Thank the interviewer(s). Mention one interesting technical problem you enjoyed solving.\\n' +\n      'Show enthusiasm for the engineering culture. Ask about timeline for next steps.\\n' +\n      'Subject line: Thank You - Technical Interview for ' + followup.title;\n  } else if (followup.followup_type === 'day_90') {\n    prompt =\n      'Write a 90-day reconnection email to ' + followup.company + ' for ' + followup.title + '.\\n' +\n      'You applied 90 days ago. Checking in about future opportunities.\\n' +\n      'Mention that you\\'re still very interested. Reference your growth in the past 3 months.\\n' +\n      'Ask if any suitable roles have opened up. Keep it short and professional.\\n' +\n      'Subject line: Reconnecting - ' + followup.title + ' Interest';\n  } else {\n    prompt =\n      'Write a brief follow-up email to ' + followup.company + ' for ' + followup.title + ' position.\\n' +\n      'This is a ' + followup.followup_label + ' check-in.\\n' +\n      'Keep it professional, under 3 sentences.';\n  }\n\n  const emailDraft = await callOllama(prompt);\n\n  results.push({\n    company: followup.company,\n    title: followup.title,\n    followup_type: followup.followup_type,\n    followup_label: followup.followup_label,\n    due_date: followup.due_date,\n    email_draft: emailDraft\n  });\n}\n\nreturn results.map(function(r) { return { json: r }; });\n"
-      }
-    },
-    {
-      "id": "bb200005-cc22-4dd2-ee22-ff2200005555",
+        "jsCode": "const groqItems    = $input.all();\nconst prepareItems = $('Prepare Follow-Up Prompts').all();\nconst today = new Date().toISOString().split('T')[0];\n\n// WHY encode draft as base64 in the URL:\n// The approval webhook needs the full draft text to show the confirmation page.\n// Base64 encoding makes it URL-safe without losing content.\nconst n8nBaseUrl = 'http://localhost:5678';\n\nlet html = '<html><body style=\"font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:20px;\">';\nhtml += '<h2 style=\"color:#007bff;\">Daily Follow-Up Digest - ' + today + '</h2>';\nhtml += '<p>You have <strong>' + groqItems.length + '</strong> follow-up(s) due today.</p>';\nhtml += '<p style=\"color:#dc3545;font-weight:bold;\">Review each draft carefully before approving. Clicking Approve opens a confirmation page first.</p>';\n\nfor (let i = 0; i < groqItems.length; i++) {\n  const meta  = prepareItems[i]?.json || {};\n  const draft = groqItems[i]?.json?.choices?.[0]?.message?.content || '[No draft]';\n\n  // Encode draft + metadata for the approval webhook\n  const payload = Buffer.from(JSON.stringify({\n    draft,\n    company: meta.company || '',\n    role: meta.role || '',\n    followup_label: meta.followup_label || '',\n    due_date: meta.due_date || today\n  })).toString('base64');\n\n  const approveUrl = n8nBaseUrl + '/webhook/approve-followup?payload=' + encodeURIComponent(payload);\n\n  html +=\n    '<div style=\"border:1px solid #dee2e6;border-radius:5px;padding:15px;margin-bottom:20px;\">' +\n    '<h3 style=\"margin-top:0;\">' + (meta.company||'') + ' - ' + (meta.role||'') + '</h3>' +\n    '<p><strong>Type:</strong> ' + (meta.followup_label||'') + ' | <strong>Due:</strong> ' + (meta.due_date||'') + '</p>' +\n    '<h4>Draft:</h4>' +\n    '<pre style=\"background:#f8f9fa;padding:15px;border-radius:5px;white-space:pre-wrap;border-left:4px solid #007bff;\">' + draft + '</pre>' +\n    '<a href=\"' + approveUrl + '\" style=\"display:inline-block;background:#28a745;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;font-weight:bold;margin-top:10px;\">Review &amp; Approve</a>' +\n    '<p style=\"color:#6c757d;font-size:0.85em;margin-top:8px;\">Clicking opens a confirmation page. Nothing sends until you confirm.</p>' +\n    '</div>';\n}\n\nhtml += '</body></html>';\nreturn [{ json: { email_html: html, followup_count: groqItems.length, date: today } }];\n"
+      },
+      "id": "f195694a-7523-43a8-981a-b52494b61870",
       "name": "Build Digest Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1400,
-        200
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "// Send daily digest of all follow-ups needed\nconst items = $input.all();\n\nif (items.length === 0 || (items.length === 1 && items[0].json.message)) {\n  return [{ json: { status: 'no_followups', date: new Date().toISOString().split('T')[0] } }];\n}\n\nlet emailBody = '<html><body style=\"font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;\">';\nemailBody += '<h2 style=\"color: #007bff;\">Daily Follow-Up Digest - ' + new Date().toISOString().split('T')[0] + '</h2>';\nemailBody += '<p>You have <strong>' + items.length + '</strong> follow-up(s) scheduled for today:</p>';\n\nfor (const item of items) {\n  const d = item.json;\n  emailBody +=\n    '<div style=\"border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 15px;\">' +\n    '<h3 style=\"color: #495057; margin-top: 0;\">' + d.company + ' - ' + d.title + '</h3>' +\n    '<p><strong>Type:</strong> ' + d.followup_label + ' | <strong>Due:</strong> ' + d.due_date + '</p>' +\n    '<h4>Suggested Email:</h4>' +\n    '<pre style=\"background: #f8f9fa; padding: 15px; border-radius: 5px; white-space: pre-wrap;\">' + (d.email_draft || 'No draft generated') + '</pre>' +\n    '</div>';\n}\n\nemailBody += '<p style=\"color: #6c757d; font-size: 0.9em;\">Auto-generated by Job Search N8N Automation</p>';\nemailBody += '</body></html>';\n\nreturn [{ json: { email_html: emailBody, followup_count: items.length, date: new Date().toISOString().split('T')[0] } }];\n"
-      }
+        1904,
+        64
+      ]
     },
     {
-      "id": "bb200006-cc22-4dd2-ee22-ff2200006666",
+      "parameters": {
+        "fromEmail": "odeliya.charitonova.dev@gmail.com",
+        "toEmail": "odeliya.charitonova.dev@gmail.com",
+        "subject": "=Daily Follow-Up Digest: {{ $json.followup_count }} action(s) - {{ $json.date }}",
+        "emailFormat": "html",
+        "html": "={{ $json.email_html }}",
+        "options": {}
+      },
+      "id": "7a2137b7-5672-47e2-908f-fff431bca779",
       "name": "Send Follow-Up Digest",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
       "position": [
-        1700,
-        200
+        2112,
+        64
       ],
-      "parameters": {
-        "fromEmail": "odeliya.charitonova.dev@gmail.com",
-        "toEmail": "odeliya.charitonova.dev@gmail.com",
-        "subject": "=Daily Follow-Up Digest: {{ $json.followup_count }} action(s) needed - {{ $json.date }}",
-        "emailFormat": "html",
-        "html": "={{ $json.email_html }}",
-        "options": {}
+      "webhookId": "83d75a1f-55cd-44a2-9703-94879132681c",
+      "credentials": {
+        "smtp": {
+          "id": "iQMNzIMVnxiFJYWF",
+          "name": "SMTP account"
+        }
       }
     },
     {
-      "id": "bb200007-cc22-4dd2-ee22-ff2200007777",
+      "parameters": {},
+      "id": "28c1f350-aa5f-48c5-af3b-df7918f504b0",
       "name": "No Action Needed",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        1100,
-        450
-      ],
-      "parameters": {}
+        1504,
+        320
+      ]
     },
     {
-      "id": "bb200008-cc22-4dd2-ee22-ff2200008888",
-      "name": "Post-Phone Screen (24h)",
-      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "id": "b3978c4d-ae35-4fb7-9973-1b05b1470e08",
+      "name": "Wait Between Drafts",
+      "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
       "position": [
-        200,
-        600
+        1616,
+        64
       ],
+      "webhookId": "wait-followup-drafts-001"
+    },
+    {
       "parameters": {
         "rule": {
           "interval": [
@@ -147,68 +301,201 @@
             }
           ]
         }
-      }
+      },
+      "id": "dfda700c-518b-44ee-9a21-794b88a1d78d",
+      "name": "Trigger Day 3",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "trigger-d3"
     },
     {
-      "id": "bb200009-cc22-4dd2-ee22-ff2200009999",
-      "name": "Check Post-Interview Follow-Ups",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        500,
-        600
-      ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "// Check for post-phone and post-technical follow-ups (24h after interview)\nconst githubToken = process.env.GITHUB_TOKEN || '';\nconst today = new Date().toISOString().split('T')[0];\nconst yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];\n\n// Look for email logs from yesterday with interview type\nif (!githubToken) {\n  return [{ json: { post_interview_followups: [], info: 'No token' } }];\n}\n\nconst owner = 'odeliyach';\nconst repo = 'job-search-data';\nconst headers = {\n  'Authorization': 'token ' + githubToken,\n  'Accept': 'application/vnd.github.v3+json'\n};\n\nconst followups = [];\n\ntry {\n  // Check email log for yesterday's interview invites\n  const logPath = 'Obsidian_Vault/Email_Log/' + yesterday + '-interview_invite.md';\n  try {\n    const fileResp = await $helpers.httpRequest({\n      method: 'GET',\n      url: 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + logPath,\n      headers: headers\n    });\n    const content = Buffer.from(fileResp.content, 'base64').toString('utf-8');\n    const fromMatch = content.match(/From: ([^\\n]+)/);\n    const company = fromMatch ? fromMatch[1] : 'Unknown Company';\n    followups.push({\n      company: company,\n      title: 'Position',\n      followup_type: 'post_phone',\n      followup_label: 'Post-Phone Screen (24h Thank You)',\n      due_date: today\n    });\n  } catch (e) { /* No interview email yesterday */ }\n\n  return [{ json: { post_interview_followups: followups, checked_date: today } }];\n} catch (e) {\n  return [{ json: { post_interview_followups: [], error: e.message } }];\n}\n"
-      }
-    },
-    {
-      "id": "bb200010-cc22-4dd2-ee22-ff2200010010",
-      "name": "Generate Post-Interview Email",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        800,
-        600
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const data = $input.item.json;\nconst followups = data.post_interview_followups || [];\n\nif (followups.length === 0) {\n  return [{ json: { message: 'No post-interview follow-ups today' } }];\n}\n\nasync function callOllama(prompt) {\n  try {\n    const resp = await $helpers.httpRequest({\n      method: 'POST',\n      url: 'http://ollama:11434/api/generate',\n      headers: { 'Content-Type': 'application/json' },\n      body: { model: 'llama3.2', prompt: prompt, stream: false }\n    });\n    return resp && resp.response ? resp.response : '[No response]';\n  } catch (e) {\n    return '[Error: ' + e.message + ']';\n  }\n}\n\nconst results = [];\nfor (const f of followups) {\n  const prompt =\n    'Write a professional thank-you follow-up email 24 hours after a phone screen with ' + f.company + '.\\n' +\n    'Keep it to 3-4 sentences. Thank them, reference the conversation, ask about next steps timeline.\\n' +\n    'Be enthusiastic but not desperate. Professional tone.';\n  const draft = await callOllama(prompt);\n  results.push({ json: { ...f, email_draft: draft } });\n}\nreturn results;\n"
-      }
-    },
-    {
-      "id": "bb200011-cc22-4dd2-ee22-ff2200011011",
-      "name": "Send Post-Interview Follow-Up",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2,
-      "position": [
-        1100,
-        600
-      ],
-      "parameters": {
-        "fromEmail": "odeliya.charitonova.dev@gmail.com",
-        "toEmail": "odeliya.charitonova.dev@gmail.com",
-        "subject": "=Post-Interview Follow-Up Ready: {{ $json.company }} - {{ $json.followup_label }}",
-        "emailFormat": "html",
-        "html": "=<html><body style=\"font-family: Arial, sans-serif; padding: 20px;\"><h2>Post-Interview Follow-Up</h2><p><strong>Company:</strong> {{ $json.company }}</p><p><strong>Type:</strong> {{ $json.followup_label }}</p><h3>Draft Email:</h3><pre style=\"background:#f8f9fa;padding:15px;border-radius:5px;white-space:pre-wrap;\">{{ $json.email_draft }}</pre></body></html>",
+        "fields": {
+          "values": [
+            {
+              "name": "followup_type_filter",
+              "stringValue": "day_3"
+            }
+          ]
+        },
         "options": {}
-      }
+      },
+      "id": "d584a4f7-abdc-4c9f-bc71-bbeb561dffb8",
+      "name": "Set Type day_3",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "ed142021-8616-4f30-bb13-2583434cb685",
+      "name": "Trigger Day 7",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        208
+      ],
+      "webhookId": "trigger-d7"
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "followup_type_filter",
+              "stringValue": "day_7"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a8f40864-4cd1-4af4-853f-031521e4ae5f",
+      "name": "Set Type day_7",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        224,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      },
+      "id": "566a4cc8-0a13-44a1-84e1-c682f62e6278",
+      "name": "Trigger Day 30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "trigger-d30"
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "followup_type_filter",
+              "stringValue": "day_30"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "834b43c3-ec02-4d44-813f-197d287478eb",
+      "name": "Set Type day_30",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        224,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 10 * * *"
+            }
+          ]
+        }
+      },
+      "id": "989bc415-68e5-4d18-b047-2a9e450258cd",
+      "name": "Trigger Day 90",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        608
+      ],
+      "webhookId": "trigger-d90"
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "followup_type_filter",
+              "stringValue": "day_90"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "45290a23-bcc6-4634-b5e7-130f72e4737e",
+      "name": "Set Type day_90",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        224,
+        608
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
-    "Daily 9 AM Trigger": {
+    "Fetch Active Applications": {
       "main": [
         [
           {
-            "node": "Check Follow-Up Schedule",
+            "node": "List Application Files",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check Follow-Up Schedule": {
+    "List Application Files": {
+      "main": [
+        [
+          {
+            "node": "Fetch File Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch File Content": {
+      "main": [
+        [
+          {
+            "node": "Parse Follow-Up Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Follow-Up Dates": {
       "main": [
         [
           {
@@ -223,7 +510,7 @@
       "main": [
         [
           {
-            "node": "Generate Follow-Up Emails",
+            "node": "Prepare Follow-Up Prompts",
             "type": "main",
             "index": 0
           }
@@ -237,7 +524,18 @@
         ]
       ]
     },
-    "Generate Follow-Up Emails": {
+    "Prepare Follow-Up Prompts": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Draft": {
       "main": [
         [
           {
@@ -259,38 +557,126 @@
         ]
       ]
     },
-    "Post-Phone Screen (24h)": {
+    "Fetch CV from GitHub": {
       "main": [
         [
           {
-            "node": "Check Post-Interview Follow-Ups",
+            "node": "Fetch Active Applications",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check Post-Interview Follow-Ups": {
+    "Wait Between Drafts": {
       "main": [
         [
           {
-            "node": "Generate Post-Interview Email",
+            "node": "Generate Email Draft",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Generate Post-Interview Email": {
+    "Trigger Day 3": {
       "main": [
         [
           {
-            "node": "Send Post-Interview Follow-Up",
+            "node": "Set Type day_3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Type day_3": {
+      "main": [
+        [
+          {
+            "node": "Fetch CV from GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Day 7": {
+      "main": [
+        [
+          {
+            "node": "Set Type day_7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Type day_7": {
+      "main": [
+        [
+          {
+            "node": "Fetch CV from GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Day 30": {
+      "main": [
+        [
+          {
+            "node": "Set Type day_30",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Type day_30": {
+      "main": [
+        [
+          {
+            "node": "Fetch CV from GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Day 90": {
+      "main": [
+        [
+          {
+            "node": "Set Type day_90",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Type day_90": {
+      "main": [
+        [
+          {
+            "node": "Fetch CV from GitHub",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
-  }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "01ffb9cc-d959-4ff9-94f1-417c32bceedd",
+  "meta": {
+    "instanceId": "23203e1a41391fea8f8c4fa4ef17097cd293961eaa4c691acf21932d52a39dfe"
+  },
+  "id": "mheviMdMNiP3nNWR",
+  "tags": []
 }
