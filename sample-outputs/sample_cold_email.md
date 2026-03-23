@@ -14,7 +14,7 @@ If you’re open to it, could we schedule a 10-minute call this week? I’m espe
 
 Thanks for considering,  
 Jordan Hale  
-jeremy.hale@fictional-mail.example | +972-50-555-0199
+jordan.hale@fictional-mail.example | +972-50-555-0199
 
 ## Hiring Manager Email (Warmer)
 Hi [Hiring Manager],

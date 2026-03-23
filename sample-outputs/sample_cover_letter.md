@@ -14,4 +14,4 @@ Thank you for your time and consideration.
 
 Best regards,  
 Jordan Hale  
-jeremy.hale@fictional-mail.example | +972-50-555-0199
+jordan.hale@fictional-mail.example | +972-50-555-0199
