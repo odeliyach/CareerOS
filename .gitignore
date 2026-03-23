@@ -27,6 +27,7 @@ desktop.ini
 
 # Private vault data (job applications — goes to job-search-data PRIVATE repo)
 vault/
+Obsidian_Vault/
 
 # N8N execution data
 .n8n/

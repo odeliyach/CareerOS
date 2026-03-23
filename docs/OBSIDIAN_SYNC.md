@@ -1,125 +1,124 @@
 # Obsidian Vault Sync - Complete Setup Guide
 
 ## Overview
-
-Your job search notes automatically sync between:
-- **N8N Automation** → commits files to GitHub
-- **GitHub Repo** (`odeliyach/job-search-data`) → stores all application data
-- **Obsidian Git Plugin** → auto-pulls every 10 minutes to your local vault
-- **Local Vault** → `C:\Users\odali\Obsidian\Job_Search_Test`
+- **N8N automation** writes application files and commits to `odeliyach/job-search-data/Obsidian_Vault/`.  
+- **GitHub (private)** stores the vault; commits include timestamps and folder moves.  
+- **Obsidian Git plugin** auto-pulls every 10 minutes to the local vault at `C:\Users\odali\Obsidian\Job_Search_Test`.  
+- The dashboard note auto-updates; the Kanban/Calendar manual layer is **not yet set up**.
 
 ---
 
-## Vault Folder Structure
-
+## Vault Folder Structure (local)
 ```
-C:\Users\odali\Obsidian\Job_Search_Test\
-├── Active\                          ← Applications in progress
-│   └── 2026\
-│       └── 03\
-│           └── 15_CompanyName_JobTitle\
-│               ├── metadata.md      ← Application details
-│               ├── resume.md        ← Tailored resume (with ATS analysis)
-│               ├── cover_letter.md  ← Custom cover letter
-│               ├── cold_email.md    ← Outreach emails
-│               ├── company_research.md
-│               ├── personal_angle.md
-│               ├── interview_prep.md ← Skills gap + Q&A + salary guide
-│               ├── portfolio_matching.md ← GitHub repos analysis
-│               ├── tracking.md      ← Status + follow-up dates
-│               └── ats_optimization.md ← ATS keyword score
+C:\Users\odali\Obsidian\Job_Search_Test
+├─ Dashboard/
+│  └─ 01_Main_Dashboard.md      ← AUTO-UPDATE: counts, recent activity, follow-ups, quick links
 │
-├── Waiting\                         ← Awaiting response (auto-moved)
-├── Offers\                          ← Offer received (auto-moved by Email Listener)
-├── Rejected\                        ← Rejected (auto-moved by Email Listener)
+├─ Job_Applications/
+│  ├─ Active/                   ← applied / initial_contact
+│  ├─ Waiting/                  ← phone_screen_scheduled / technical_scheduled
+│  ├─ Offers/                   ← offer_received
+│  └─ Rejected/                 ← rejected
+│      └─ [Company].md          ← single source of truth per application
 │
-├── Email_Log\                       ← Email event log
-│   └── 2026-03-19-rejection.md
+├─ My_Materials/
+│  ├─ Base_Resume.md
+│  ├─ Resume_Versions/          ← [Company]_Resume_v1.md + Resume_Index.md (auto-generated)
+│  └─ Portfolio_Projects/       ← Projects_Summary.md + Skills_Matrix.md (auto-generated)
 │
-└── analytics.md                     ← Overall job search analytics
+├─ Interview_Prep/
+│  ├─ Company_Specific/         ← [Company]_Interview.md + Interview_Index.md (auto-generated)
+│  ├─ LeetCode_Progress.md (optional)
+│  ├─ System_Design_Notes.md (optional)
+│  └─ Behavioral_Questions.md (optional)
+│
+├─ Resources/                   ← user maintained
+├─ Templates/                   ← reference templates
+└─ Database/
+   └─ job_search.db             ← sqlite mirror (if enabled)
 ```
 
----
-
-## GitHub Repository Mirror
-
-The same structure is mirrored in `odeliyach/job-search-data`:
-
+### GitHub Mirror
 ```
 odeliyach/job-search-data/
-├── Obsidian_Vault/                  ← Auto-synced to Obsidian
-│   ├── Active/
-│   ├── Waiting/
-│   ├── Offers/
-│   ├── Rejected/
-│   └── Email_Log/
-├── 2026/                            ← Legacy path (backwards compatibility)
-│   └── 03/
-└── analytics.md
+└─ Obsidian_Vault/
+   ├─ Dashboard/
+   ├─ Job_Applications/{Active,Waiting,Offers,Rejected}/
+   ├─ My_Materials/{Resume_Versions,Portfolio_Projects}/
+   ├─ Interview_Prep/Company_Specific/
+   ├─ Resources/
+   ├─ Templates/
+   └─ Database/job_search.db
 ```
 
 ---
 
-## Obsidian Git Plugin Configuration
-
-### Installation
-1. Open Obsidian → Settings → Community Plugins
-2. Search for "Obsidian Git"
-3. Install and Enable
-
-### Settings
-```
-Remote: https://github.com/odeliyach/job-search-data.git
-Branch: main
-Auto-pull interval: 10 minutes
-Auto-push: disabled (N8N handles pushes)
-Pull before push: enabled
-```
-
-### How to Configure
-1. Settings → Obsidian Git
-2. Set "Auto-pull interval": `10`
-3. Set "Auto commit interval": `0` (disabled - N8N commits)
-4. Enable "Pull on startup"
-5. Enable "Disable push" (N8N pushes, not Obsidian)
+## Source of Truth: Application Files
+- Each `Job_Applications/[Status]/[Company].md` file carries frontmatter:
+  ```
+  company, position, link, date_sent, stage, resume_version,
+  referral, salary_range, contact, notes
+  ```
+- **Stage values (pipeline view):** Applied → HR → OA → Technical Interview → Final → Offer / Rejected.  
+- **Status (folder move):** `applied`, `phone_screen_scheduled`, `technical_scheduled`, `offer_received`, `rejected`.
+- **Auto-filled by N8N:** company, position, date_sent, follow-up dates.  
+- **Manual as things evolve:** stage, resume_version, referral, contact, notes.
 
 ---
 
-## Status Auto-Tracking
+## Auto-Organization Logic (N8N)
+| Status | Destination folder | Commit message pattern |
+|---|---|---|
+| applied / initial_contact | `Job_Applications/Active/` | `Created {Company}.md (Applied)` |
+| phone_screen_scheduled / technical_scheduled | `Job_Applications/Waiting/` | `Moved {Company}.md: Applied → Waiting` |
+| offer_received | `Job_Applications/Offers/` | `Moved {Company}.md: Waiting → Offers` |
+| rejected | `Job_Applications/Rejected/` | `Moved {Company}.md: {Prev} → Rejected` |
 
-N8N workflows automatically organize applications by status:
+Moves happen in Git; Obsidian Git pulls the change automatically.
 
-| Status | Folder | Trigger |
-|--------|--------|---------|
-| **Active** | `Active/` | New application created |
-| **Waiting** | `Waiting/` | Manual update via N8N |
-| **Offers** | `Offers/` | Email Listener detects offer email |
-| **Rejected** | `Rejected/` | Email Listener detects rejection email |
+---
+
+## Auto-Created / Auto-Updated Files
+- `Dashboard/01_Main_Dashboard.md` — totals, upcoming follow-ups (next 7 days), recent activity, quick links to active apps.  
+- `Job_Applications/.../[Company].md` — main application note with Tier 1–3 outputs plus follow-up schedule and communication log.  
+- `My_Materials/Resume_Versions/` — `[Company]_Resume_v1.md` per app + `Resume_Index.md`.  
+- `Interview_Prep/Company_Specific/` — `[Company]_Interview.md` per app + `Interview_Index.md`.  
+- `Portfolio_Projects/` — `Projects_Summary.md` and `Skills_Matrix.md` stay in sync with portfolio metadata.  
+- Email listener writes logs to `Obsidian_Vault/Email_Log/` (private repo).
 
 ---
 
 ## Auto-Folder Creation
-
-The N8N Git Commit node (in `workflow-all-tiers.json`) automatically:
-1. Creates year/month/company folders on first commit
-2. Saves all application files to the correct path
-3. Commits with descriptive message: `Job application: Company - Title - Date`
+N8N ensures required folders exist before writing:
+```
+Dashboard
+Job_Applications
+Job_Applications/Active
+Job_Applications/Waiting
+Job_Applications/Offers
+Job_Applications/Rejected
+My_Materials
+My_Materials/Resume_Versions
+My_Materials/Portfolio_Projects
+Interview_Prep
+Interview_Prep/Company_Specific
+Resources
+Templates
+```
+If missing, the workflow creates the folder (with `.gitkeep` if needed) and commits, so Obsidian always sees the structure.
 
 ---
 
-## Email Listener Sync
-
-`workflow-email-listener.json` monitors Gmail and:
-1. Detects rejections → logs to `Rejected/Email_Log/`
-2. Detects interview invites → logs to `Active/Email_Log/`
-3. Detects offers → logs to `Offers/Email_Log/`
-4. All events appear in Obsidian within 10 minutes (next auto-pull)
+## Views (Dataview · Kanban · Calendar)
+- **Dataview table** lives in `Dashboard/01_Main_Dashboard.md` and renders directly from frontmatter—no manual maintenance.  
+- **Kanban board** (`Job_Tracker_Kanban.md`) is manual: drag cards between stages when status changes.  
+- **Calendar plugin** is optional for journaling interviews, calls, and events.  
+- Manual layer (Dataview, Kanban, Calendar wiring) is **partial / not fully configured**; data still flows automatically via N8N + Git.
 
 ---
 
-## Follow-Up Schedule (in tracking.md)
-
-Each application's `tracking.md` contains:
+## Follow-Up Schedule (per application note)
+Example block inside `[Company].md`:
 ```markdown
 ## Follow-Up Schedule
 - [ ] Day 3 check-in: 2026-03-22
@@ -127,75 +126,47 @@ Each application's `tracking.md` contains:
 - [ ] Day 30 check-in: 2026-04-18
 - [ ] 90-day check-in: 2026-06-17
 ```
-
-The `workflow-followup-scheduler.json` runs daily at 9 AM and:
-- Reads all `tracking.md` files from GitHub
-- Identifies which follow-ups are due today
-- Generates personalized email drafts via Ollama
-- Emails you a digest with all action items
+The follow-up scheduler workflow reads these dates, generates drafts, and emails a digest for manual approval. Emails are **never auto-sent**.
 
 ---
 
-## Obsidian Templates (Recommended)
-
-Create these in `C:\Users\odali\Obsidian\Job_Search_Test\Templates\`:
-
-### Application Template
-```markdown
----
-status: Active
-company: {{company}}
-role: {{role}}
-applied: {{date}}
----
-
-# {{company}} - {{role}}
-
-> [Application auto-created by N8N Job Search Automation]
-```
+## Obsidian Git Plugin Configuration
+1) Obsidian → Settings → Community Plugins → search “Obsidian Git” → Install & Enable.  
+2) Settings → Obsidian Git:  
+   - Remote: `https://github.com/odeliyach/job-search-data.git`  
+   - Branch: `main`  
+   - Auto-pull interval: `10` minutes  
+   - Auto-push/auto-commit: disabled (N8N handles commits)  
+   - Pull before push: enabled; Pull on startup: enabled
+3) Clone `odeliyach/job-search-data` to `C:\Users\odali\Obsidian\Job_Search_Test`, then click **Pull from remote** once.
 
 ---
 
 ## Quick Reference: File Purposes
-
 | File | Purpose | Generated by |
-|------|---------|--------------|
-| `metadata.md` | Company, role, URL, dates | Tier 1 |
-| `resume.md` | Tailored resume + ATS analysis | Tier 1 + ATS node |
-| `cover_letter.md` | Custom cover letter | Tier 1 |
-| `cold_email.md` | Outreach email drafts | Tier 2 |
-| `company_research.md` | Company background | Tier 2 |
-| `personal_angle.md` | Connection strategies | Tier 2 |
-| `interview_prep.md` | Skills gap + Q&A + salary | Tier 3 |
-| `portfolio_matching.md` | GitHub repo analysis | Tier 4 |
-| `tracking.md` | Status + follow-up schedule | Tier 5 |
-| `ats_optimization.md` | ATS keyword score | ATS node |
+|---|---|---|
+| `[Company].md` | Frontmatter + all Tier outputs + schedule | Tier 1–3 + scheduler |
+| `[Company]_Resume_v1.md` | Tailored resume | Tier 6 |
+| `Resume_Index.md` | List of resume versions | Index node |
+| `[Company]_Interview.md` | Company-specific prep | Tier 3 |
+| `Interview_Index.md` | List of interview docs | Index node |
+| `Projects_Summary.md` / `Skills_Matrix.md` | Portfolio overview + skills map | Portfolio node |
+| `Email_Log/*.md` | Incoming email events + drafts | Email listener |
+| `Dashboard/01_Main_Dashboard.md` | Counts, follow-ups, links | Main workflow |
 
 ---
 
 ## Environment Requirements
-
 | Variable | Value |
-|----------|-------|
-| `GITHUB_TOKEN` | Personal access token (repo scope) for `odeliyach/job-search-data` |
+|---|---|
+| `GITHUB_TOKEN` | Repo scope for `odeliyach/job-search-data` |
 | Gmail OAuth2 | For email listener workflow |
-| N8N URL | For approval webhook in Wait node |
+| N8N URL | Used by approval webhook in Wait nodes |
 
 ---
 
 ## Troubleshooting
-
-**Files not appearing in Obsidian?**
-- Check Obsidian Git plugin → pull manually
-- Verify `GITHUB_TOKEN` has write access to `job-search-data`
-- Check N8N execution logs for Git Commit node errors
-
-**Email listener not classifying correctly?**
-- Check Gmail trigger filter query
-- Look at "Classify Email" node output in N8N
-- Adjust keyword lists in the classify node if needed
-
-**Follow-ups not triggering?**
-- Verify `tracking.md` has correct date format: `YYYY-MM-DD`
-- Check `GITHUB_TOKEN` has read access to `job-search-data`
-- Run "Check Follow-Up Schedule" node manually to test
+- **Files not appearing?** Pull manually with Obsidian Git; confirm `GITHUB_TOKEN` has write access; check N8N Git Commit node logs.  
+- **Email listener mislabels?** Adjust Gmail trigger query; review the “Classify Email” node output; tune keyword lists.  
+- **Follow-ups not firing?** Ensure dates use `YYYY-MM-DD`; confirm the scheduler workflow ran; verify `GITHUB_TOKEN` read access.  
+- **Folders missing?** Re-run the workflow; the auto-folder creation step will add `.gitkeep` files and commit the structure.  
