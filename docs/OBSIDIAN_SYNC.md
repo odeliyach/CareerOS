@@ -132,14 +132,19 @@ The follow-up scheduler workflow reads these dates, generates drafts, and emails
 ---
 
 ## Obsidian Git Plugin Configuration
-1) Obsidian → Settings → Community Plugins → search “Obsidian Git” → Install & Enable.  
-2) Settings → Obsidian Git:  
-   - Remote: `https://github.com/odeliyach/job-search-data.git`  
+1) Install: Obsidian → Settings → Community Plugins → search “Obsidian Git” → Install & Enable.  
+2) Clone the repo locally (outside Obsidian):  
+   ```bash
+   git clone https://github.com/odeliyach/job-search-data.git "C:\Users\odali\Obsidian\Job_Search_Test"
+   ```  
+   This gives Obsidian a working copy to read from.
+3) Configure in Obsidian (Settings → Obsidian Git):  
+   - Remote: `https://github.com/odeliyach/job-search-data.git` (should already be set from the clone)  
    - Branch: `main`  
    - Auto-pull interval: `10` minutes  
    - Auto-push/auto-commit: disabled (N8N handles commits)  
    - Pull before push: enabled; Pull on startup: enabled
-3) Clone `odeliyach/job-search-data` to `C:\Users\odali\Obsidian\Job_Search_Test`, then click **Pull from remote** once.
+4) In Obsidian Git, click **Pull from remote** once to sync the freshly cloned folder.
 
 ---
 

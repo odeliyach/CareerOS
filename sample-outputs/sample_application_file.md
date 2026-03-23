@@ -26,7 +26,7 @@ notes: "Submitted via the careers portal; follow-up in 3 days."
 | Role | Full-Stack Developer |
 | Status | 🟢 Active (Applied) |
 | Applied Date | 2026-03-10 |
-| Days Since | 5 |
+| Days Since | 13 |
 | Salary Range | ₪28,000 - ₪32,000 monthly |
 | Location | Tel Aviv, Israel |
 | Job Link | https://careers.novagrid.example/jobs/full-stack-developer |
