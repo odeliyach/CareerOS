@@ -1,0 +1,51 @@
+# CareerOS — GitHub Actions
+# Validates workflow JSONs and deploys index.html to GitHub Pages on push to main
+
+name: Deploy Portfolio Demo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate workflow JSONs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate n8n workflow JSONs
+        run: |
+          echo "Validating workflow JSON files..."
+          for f in n8n-workflows/*.json; do
+            python3 -c "import json, sys; json.load(open('$f')); print(f'✓ {\"$f\"}')"
+          done
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
