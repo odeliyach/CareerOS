@@ -1,16 +1,16 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/CareerOS-v1.0-c87da0?style=for-the-badge&labelColor=252235" alt="CareerOS"/>
+<img src="https://img.shields.io/badge/CareerOS-v1.0-D4A5A5?style=for-the-badge&labelColor=393346&logo=sparkles" alt="CareerOS"/>
 
 # CareerOS — Automated Job Intelligence System
 
 **End-to-end job search automation: AI analysis · CV tailoring · follow-up scheduling · Gmail classification · inbox auto-labeling · live portfolio dashboard**
 
-[![Demo](https://img.shields.io/badge/Live_Demo-odeliyach.github.io%2FCareerOS-78b898?style=flat-square&logo=github)](https://odeliyach.github.io/CareerOS)
-[![n8n](https://img.shields.io/badge/n8n-Workflow_Automation-EF6C00?style=flat-square&logo=n8n)](https://n8n.io)
-[![Groq](https://img.shields.io/badge/Groq-LLaMA_3.1-F55036?style=flat-square)](https://groq.com)
-[![GitHub](https://img.shields.io/badge/Data_Store-GitHub_API-181717?style=flat-square&logo=github)](https://github.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Demo](https://img.shields.io/badge/Live_Demo-odeliyach.github.io%2FCareerOS-B5C99A?style=flat-square&logo=github&logoColor=white)](https://odeliyach.github.io/CareerOS)
+[![n8n](https://img.shields.io/badge/n8n-Workflow_Automation-FFB5A7?style=flat-square&logo=n8n&logoColor=white)](https://n8n.io)
+[![Groq](https://img.shields.io/badge/Groq-LLaMA_3.1-FFC09F?style=flat-square&logoColor=white)](https://groq.com)
+[![GitHub](https://img.shields.io/badge/Data_Store-GitHub_API-AED9E0?style=flat-square&logo=github&logoColor=333)](https://github.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-B5C99A?style=flat-square)](LICENSE)
 
 ---
 
@@ -238,27 +238,58 @@ The email listener doesn't just detect rejections — it detects which stage the
 CareerOS/
 ├── index.html                          # Portfolio demo (GitHub Pages)
 ├── docker-compose.yml                  # n8n local setup
-├── Makefile                            # make start / stop / logs
+├── Dockerfile                          # n8n container configuration
+├── Makefile                            # make start / stop / logs / restart
 ├── .env.example                        # Environment variables template
+├── .gitignore                          # Git ignore patterns
+│
+├── .github/
+│   └── workflows/
+│       └── deploy.yml                  # CI/CD: validates JSONs + deploys to GitHub Pages
 │
 ├── n8n-workflows/
-│   ├── workflow-all-tiers.json         # Main pipeline (Form + Webhook triggers)
-│   ├── workflow-followup-scheduler.json# Daily follow-up digest (split by type across 4 triggers)
-│   ├── workflow-email-listener.json    # Gmail classifier — rejection/invite/offer detection
-│   └── workflow-gmail-labeler.json     # Inbox auto-labeling every 30 min
+│   ├── workflow-all-tiers.json         # Main pipeline (6 tiers: resume → portfolio)
+│   ├── workflow-followup-scheduler.json# Daily follow-up digest (4 cron triggers)
+│   ├── workflow-email-listener.json    # Gmail classifier (rejection/invite/offer)
+│   ├── workflow-gmail-labeler.json     # Inbox auto-labeling every 30 min
+│   └── helper-get-label-ids.json       # Helper: fetch Gmail label IDs
 │
 ├── prompts/
-│   └── PROMPTS.md                      # All LLM prompts used in workflow nodes
+│   ├── 01-resume.md                    # Tier 1: Resume analysis prompt
+│   ├── 02-cover-letter.md              # Tier 1: Cover letter prompt
+│   ├── 03-cold-email.md                # Tier 2: Cold outreach prompt
+│   ├── 04-interview-prep.md            # Tier 3: Interview prep prompt
+│   ├── 05-talking-points.md            # Tier 3: Talking points prompt
+│   ├── 06-skills-gap.md                # Tier 3: Skills gap analysis prompt
+│   ├── 07-portfolio-github.md          # Tier 4: Portfolio matching prompt
+│   ├── 08-salary-negotiation.md        # Tier 3: Salary negotiation prompt
+│   └── PROMPTS.md                      # Complete prompts reference (all tiers)
 │
 ├── sample-outputs/
-│   ├── sample_application_file.md      # Real output: merged application note
-│   ├── sample_resume_analysis.md       # Real output: T1 resume analysis
-│   └── sample_cold_email.md            # Real output: T2 cold outreach
+│   ├── sample_application_file.md      # Example: full application with all tiers
+│   ├── sample_resume_analysis.md       # Example: Tier 1 resume analysis output
+│   ├── sample_cover_letter.md          # Example: Tier 1 cover letter output
+│   ├── sample_cold_email.md            # Example: Tier 2 cold outreach output
+│   └── sample_interview_prep.md        # Example: Tier 3 interview prep output
 │
 └── docs/
-    ├── SETUP.md                        # How to run locally
-    └── TROUBLESHOOTING.md              # Real bugs fixed and why
+    ├── SETUP.md                        # Installation and local setup guide
+    ├── ARCHITECTURE.md                 # System design and data flow diagrams
+    ├── TROUBLESHOOTING.md              # Common issues and debugging guide
+    ├── CHANGELOG.md                    # Version history and feature updates
+    └── OBSIDIAN_SYNC.md                # Obsidian vault integration guide
 ```
+
+---
+
+## Documentation
+
+- **[Setup Guide](docs/SETUP.md)** — Installation, prerequisites, and local setup
+- **[Architecture](docs/ARCHITECTURE.md)** — System design, data flow, and component breakdown
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — Common issues, debugging, and real bugs fixed
+- **[Changelog](docs/CHANGELOG.md)** — Version history and feature updates
+- **[Obsidian Integration](docs/OBSIDIAN_SYNC.md)** — Vault setup, Git sync, and Dataview queries
+- **[Prompts Reference](prompts/PROMPTS.md)** — All LLM prompts used in workflows
 
 ---
 
