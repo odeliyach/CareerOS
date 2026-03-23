@@ -174,7 +174,7 @@ textarea::placeholder{color:var(--text-dim)}
 /* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(22,20,35,.88);backdrop-filter:blur(10px);z-index:2000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s}
 .modal-bg.open{opacity:1;pointer-events:all}
-.modal{background:var(--bg2);border:1px solid rgba(200,125,160,.2);border-radius:16px;padding:34px 30px;width:330px;transform:scale(.94) translateY(12px);transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+.modal{background:var(--bg2);border:1px solid rgba(200,125,160,.2);border-radius:16px;padding:34px 30px;width:330px;position:relative;transform:scale(.94) translateY(12px);transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
 .modal-bg.open .modal{transform:scale(1) translateY(0)}
 .modal-title{font-family:var(--font-s);font-size:22px;font-weight:500;color:var(--pearl);margin-bottom:5px}
 .modal-sub{font-size:12px;font-weight:300;color:var(--text-mid);line-height:1.6;margin-bottom:20px}
@@ -211,8 +211,9 @@ textarea::placeholder{color:var(--text-dim)}
 <canvas id="aurora"></canvas>
 
 <!-- MODAL -->
-<div class="modal-bg" id="modalBg">
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
   <div class="modal">
+    <button onclick="closeModal()" style="position:absolute;top:14px;right:16px;background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;line-height:1;padding:2px 6px;">×</button>
     <div class="modal-title">Owner Access</div>
     <div class="modal-sub">Enter your password to unlock live data and the workflow trigger.</div>
     <input type="password" class="modal-in" id="modalPass" placeholder="••••••••">
@@ -309,8 +310,8 @@ textarea::placeholder{color:var(--text-dim)}
         <span class="lock-ico" id="lockIco">🔒</span>
         <span id="lockLbl" style="font-size:11px;color:var(--text-dim)">Unlock live mode to use</span>
       </div>
-      <textarea id="jdInput" placeholder="Paste a job description…" disabled></textarea>
-      <button class="btn" id="aBtn" onclick="runAnalysis()" disabled>Analyze Role</button>
+      <textarea id="jdInput" placeholder="Paste a job description…"></textarea>
+      <button class="btn" id="aBtn" onclick="runAnalysis()">Analyze Role</button>
       <div class="term" id="termOut"><span class="t-dim">// awaiting input…</span></div>
       <div class="result" id="resCard">
         <div class="r-score" id="rScore">—</div>
@@ -594,6 +595,13 @@ async function checkPass(){
 }
 document.getElementById('modalPass').addEventListener('keydown',e=>{ if(e.key==='Enter')checkPass(); });
 
+function closeModal(){
+  document.getElementById('modalBg').classList.remove('open');
+  document.getElementById('modalPass').value='';
+  document.getElementById('modalErr').textContent='';
+  // if they closed without authenticating, make sure toggle stays off
+  if(!isAuth){ document.getElementById('tSw').classList.remove('on'); }
+}
 function onToggle(){
   if(!isLive){if(!isAuth){document.getElementById('modalBg').classList.add('open');document.getElementById('modalPass').focus();}else activateLive();}
   else deactivateLive();
@@ -619,8 +627,6 @@ function deactivateLive(){
   document.getElementById('lockIco').className='lock-ico';
   document.getElementById('lockLbl').textContent='Unlock live mode to use';
   document.getElementById('lockLbl').style.color='var(--text-dim)';
-  document.getElementById('jdInput').disabled=true;
-  document.getElementById('aBtn').disabled=true;
   renderAll(SAMPLE);
 }
 
