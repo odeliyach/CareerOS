@@ -163,27 +163,6 @@ Incoming email
 
 The labeler is 5 nodes: `Every 30 Minutes` → `Fetch Emails` (Gmail) → `Fix Logic` (Code, dedup + classify) → `Clear All` (Gmail, removes old labels) → `Apply Label` (Gmail). The Clear+Apply pattern ensures exactly one label per thread with no stale labels.
 
-> **Production note:** `Fix Logic` contains `const TIME_LIMIT = 12 * 60 * 60 * 1000;` — change to `60 * 1000` for testing (1 minute escalation).
-
----
-
-## Obsidian Integration
-
-The system maintains a local Obsidian vault that stays in sync with the private GitHub repo via the Obsidian Git plugin (auto-pull every 10 minutes).
-
-**What's wired (automatic):**
-- `Dashboard/Main_Dashboard.md` — updated on every new application by the main workflow. Contains a Dataview table that auto-renders from frontmatter across all application files.
-- Each application `.md` file in `Job_Applications/Active/` with frontmatter fields: `company`, `position`, `link`, `date_sent`, `stage`, `resume_version`, `referral`, `salary_range`, `contact`, `notes`
-- Email log entries committed to `Obsidian_Vault/Email_Log/` on every classified email
-
-**What requires manual setup (not yet done):**
-- Kanban board (`Job_Tracker_Kanban.md`) — drag cards between stages manually as status changes
-- Calendar plugin — daily journaling of interviews, calls, and events
-- Dataview plugin installation
-
-**How the three views work together:**
-The `.md` frontmatter is the single source of truth. The Dataview table in `Main_Dashboard.md` re-renders automatically when any field changes. The Kanban board gives a drag-and-drop stage view (5 seconds to update). The Calendar gives a daily log of what happened.
-
 ---
 
 ## Tech Stack
@@ -191,47 +170,13 @@ The `.md` frontmatter is the single source of truth. The Dataview table in `Main
 | Layer | Technology | Why |
 |---|---|---|
 | **Workflow engine** | n8n (self-hosted, Docker) | Visual graph I can show in interviews; handles retries, scheduling, error routing out of the box |
-| **LLM inference** | Groq API — LLaMA 3.1 8B | Free tier, ~200 tokens/sec, OpenAI-compatible API |
+| **LLM inference** | Groq API - LLaMA 3.1 8B | Free tier, ~200 tokens/sec, OpenAI-compatible API |
 | **Data store** | GitHub API (private repo) | Version history on every file, human-readable, zero cost, works natively with Obsidian |
 | **Local dashboard** | Obsidian + Dataview | Queries live from `.md` frontmatter — no manual maintenance |
 | **Portfolio demo** | Vanilla HTML/CSS/JS | No framework overhead; SHA-256 password auth via native Web Crypto API |
 | **Deployment** | GitHub Pages | Zero hosting cost, auto-deploys on push |
 
 ---
-
-## Key Engineering Decisions
-
-These are the interesting problems — worth understanding before an interview.
-
-**GitHub as a database**
-Each application is a `.md` file with YAML frontmatter. GitHub gives version history, diffs on every field change, and a human-readable audit trail. Obsidian's Dataview plugin queries the same files locally. For this use case it's strictly better than SQLite.
-
-**GitHub SHA pattern**
-The GitHub API returns `422` if you try to overwrite an existing file without passing its current `sha`. Every commit node does a `GET` first to extract the sha, then passes `sha || undefined` in the `PUT` body. First run creates the file; subsequent runs update it.
-
-**Rate limit architecture**
-Groq's free tier allows 6000 TPM. With 14 LLM calls per job submission, every consecutive pair of Groq requests has a 30-second wait node between them. The follow-up scheduler splits by follow-up type across 4 triggers (9:00, 9:30, 10:00, 10:30) so each run only processes one type — keeping each batch well under the limit.
-
-**Fire-and-forget webhook**
-The demo fires the n8n webhook and immediately shows a simulated result. The actual pipeline takes 8–10 minutes. Blocking the UI would destroy the interview experience — so the `fetch()` call is fire-and-forget (`.catch(()=>{})`) and the terminal animation always completes cleanly.
-
-**n8n `$input.all()` positional indexing bug**
-n8n's merge node passes items positionally — `$input.all()[0]` breaks when a node has multiple upstream inputs. Fixed by reading nodes by name (`$('Tier 1 - Core Application').first().json`) instead of position. This is a non-obvious n8n behavior that cost several debugging sessions.
-
-**Human-in-the-loop design**
-Follow-up emails are drafted but never auto-sent. The scheduler generates drafts and emails a digest for manual approval. Deliberate decision: anything that goes to a real recruiter requires a human sign-off.
-
-**Gmail deduplication**
-The Gmail Trigger fetches by message, not by thread — because switching to the thread resource breaks downstream node IDs (different format). Deduplication by `threadId` happens in a Code node running in "Run Once for All Items" mode so `$input.all()` can compare across all messages in one pass.
-
-**Email classification: case-sensitive field names**
-Gmail API returns `From` and `To` with capital letters, and `labels` as an array of `{id, name}` objects — not `labelIds`. This caused silent failures until discovered. The `isReply` detection uses subject `Re:` prefix only for outgoing emails — using thread labels for this caused false `REPLIED` on first outreach to recruiters (thread already had `FROM_RECRUITER` label from an earlier message).
-
-**Stage-aware rejection responses**
-The email listener doesn't just detect rejections — it detects which stage the rejection happened at (phone screen / technical / final round) based on body keywords. Each stage gets a different response template with appropriate tone and content.
-
----
-
 ## Repo Structure
 
 ```
@@ -310,25 +255,6 @@ Then import the workflow JSONs from `n8n-workflows/` via n8n UI → Import from 
 
 ---
 
-## Roadmap
-
-- [ ] `fetchLiveData()` — read real application stats from private GitHub repo into the demo dashboard
-- [ ] Application Status Auto-Update from recruiter emails (Phase 2a)
-- [ ] Weekly Summary workflow (Sunday 9am digest)
-- [ ] Docker deployment so webhook is always live (not localhost-only)
-- [ ] Obsidian Dataview · Kanban · Calendar setup
-
----
-
-## Interview Notes
-
-> This section exists for me. Putting it here because it's honest.
-
-Things I'd do differently with more time: containerize n8n properly so the webhook is always accessible (not just when my laptop is on), add a real database instead of GitHub files for querying across applications, write tests for the workflow logic.
-
-Things I'm proud of: the rate-limit architecture, the GitHub SHA pattern, the fire-and-forget demo design, and the fact that I actually use this system daily.
-
----
 
 <div align="center">
 
