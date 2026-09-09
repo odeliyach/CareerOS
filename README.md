@@ -2,7 +2,7 @@
 
 <img src="https://img.shields.io/badge/CareerOS-v1.0-D4A5A5?style=for-the-badge&labelColor=393346&logo=sparkles" alt="CareerOS"/>
 
-# CareerOS — Automated Job Intelligence System
+# CareerOS :Automated Job Intelligence System
 
 **End-to-end job search automation: AI analysis · CV tailoring · follow-up scheduling · Gmail classification · inbox auto-labeling · live portfolio dashboard**
 
