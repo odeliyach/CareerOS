@@ -29,6 +29,7 @@ jobs:
     needs: validate
     if: github.ref == 'refs/heads/main'
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write
