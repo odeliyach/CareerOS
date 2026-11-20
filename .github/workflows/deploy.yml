@@ -1,5 +1,5 @@
-# CareerOS — GitHub Actions
-# Validates workflow JSONs and deploys index.html to GitHub Pages on push to main
+# CareerOS, GitHub Actions
+# Validates the n8n workflow JSON files, then publishes index.html to GitHub Pages on push to main.
 
 name: Deploy Portfolio Demo
 
@@ -20,14 +20,34 @@ jobs:
         run: |
           echo "Validating workflow JSON files..."
           for f in n8n-workflows/*.json; do
-            python3 -c "import json, sys; json.load(open('$f')); print(f'✓ {\"$f\"}')"
+            python3 -c "import json, sys; json.load(open('$f')); print('OK', '$f')"
           done
+
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect site files
+        run: |
+          mkdir _site
+          cp index.html _site/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
 
   deploy:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
-    needs: validate
-    if: github.ref == 'refs/heads/main'
+    needs: build
     permissions:
       contents: read
       pages: write
@@ -36,16 +56,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
