@@ -1,4 +1,4 @@
-# CareerOS — GitHub Actions
+# CareerOS, GitHub Actions
 # Validates workflow JSONs and deploys index.html to GitHub Pages on push to main
 
 name: Deploy Portfolio Demo

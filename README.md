@@ -2,264 +2,173 @@
 
 <img src="https://img.shields.io/badge/CareerOS-v1.0-D4A5A5?style=for-the-badge&labelColor=393346&logo=sparkles" alt="CareerOS"/>
 
-# CareerOS :Automated Job Intelligence System
+# CareerOS: Automated Job Intelligence System
 
-**End-to-end job search automation: AI analysis · CV tailoring · follow-up scheduling · Gmail classification · inbox auto-labeling · live portfolio dashboard**
+**End-to-end job search automation: AI analysis · CV tailoring · follow-up scheduling · Gmail classification · inbox auto-labeling · portfolio dashboard**
 
 [![Demo](https://img.shields.io/badge/Live_Demo-odeliyach.github.io%2FCareerOS-B5C99A?style=flat-square&logo=github&logoColor=white)](https://odeliyach.github.io/CareerOS)
 [![n8n](https://img.shields.io/badge/n8n-Workflow_Automation-FFB5A7?style=flat-square&logo=n8n&logoColor=white)](https://n8n.io)
-[![Groq](https://img.shields.io/badge/Groq-LLaMA_3.1-FFC09F?style=flat-square&logoColor=white)](https://groq.com)
+[![Groq](https://img.shields.io/badge/Groq-gpt--oss--120b-FFC09F?style=flat-square&logoColor=white)](https://groq.com)
 [![GitHub](https://img.shields.io/badge/Data_Store-GitHub_API-AED9E0?style=flat-square&logo=github&logoColor=333)](https://github.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-B5C99A?style=flat-square)](LICENSE)
 
----
-
-> *"I didn't want another spreadsheet. I wanted a system that thinks."*
-
 </div>
 
 ---
 
-## What is CareerOS?
+A job search automation system I built with n8n. Paste a job description and it produces a tailored CV, cover letter, outreach emails, interview prep, and a follow-up schedule, then saves everything as Markdown files in a private GitHub repo.
 
-CareerOS is a fully automated job search operating system. Paste a job description — within minutes it produces a tailored CV, cover letter, cold outreach emails, interview prep, ATS keyword analysis, and a follow-up schedule. Everything commits automatically to a private GitHub repo and surfaces in Obsidian.
+The live demo is a static dashboard with sample data. The Analyze button only works against a local n8n.
 
-The system runs entirely on your own machine. No SaaS subscriptions. No per-request costs beyond Groq's generous free tier.
+## Why I built it
 
----
+I was applying to a lot of roles and tracking them in spreadsheets. I wanted something that does the repetitive parts (reading the posting, tailoring the CV, reminding me to follow up) and keeps a full history I can read and diff. It is also a project to practice workflow design, LLM prompting, and working with API limits.
 
-## Live Demo
+## How it works
 
-> **[→ odeliyach.github.io/CareerOS](https://odeliyach.github.io/CareerOS)**
-
-Paste any job description and watch the pipeline run. The dashboard shows a real pipeline — the Analyze panel fires the actual n8n webhook when run locally.
-
-<!-- SCREENSHOT PLACEHOLDER -->
-<!-- Add screenshots below once captured:
-![Dashboard Overview](docs/screenshots/dashboard-overview.png)
-![Analyze Panel](docs/screenshots/analyze-panel.png)
-![Terminal Animation](docs/screenshots/terminal-animation.png)
-![Result Card](docs/screenshots/result-card.png)
--->
-
----
-
-## Architecture
+The steps run in a fixed order, and the LLM writes the content of each step. That keeps the system predictable and cheap to run.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      INPUT                                  │
-│         Job Description (via Form or Webhook)               │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   n8n WORKFLOW ENGINE                        │
-│                  (Docker · localhost:5679)                   │
-│                                                             │
-│  Extract Job Fields ──► Parse Job Fields                    │
-│          │                                                  │
-│          ▼                                                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  TIER 1 — Core Application          (Groq · 3 calls) │   │
-│  │  Resume Analysis · Cover Letter · Job Fit Score      │   │
-│  │  ATS Keyword Optimization (pure JS, no LLM)          │   │
-│  └──────────────────┬───────────────────────────────────┘   │
-│                     │  Wait 30s                             │
-│  ┌──────────────────▼───────────────────────────────────┐   │
-│  │  TIER 2 — Cold Outreach             (Groq · 4 calls) │   │
-│  │  Intro Email · Follow-Up · Company Research          │   │
-│  │  LinkedIn Messages                                   │   │
-│  └──────────────────┬───────────────────────────────────┘   │
-│                     │  Wait 30s                             │
-│  ┌──────────────────▼───────────────────────────────────┐   │
-│  │  TIER 3 — Interview Prep            (Groq · 4 calls) │   │
-│  │  Skills Gap · Interview Q&A · Talking Points         │   │
-│  │  Salary Guide                                        │   │
-│  └──────────────────┬───────────────────────────────────┘   │
-│                     │  Wait 45s                             │
-│  ┌──────────────────▼───────────────────────────────────┐   │
-│  │  TIER 4 — Portfolio Matching        (Groq · 1 call)  │   │
-│  │  GitHub API fetch · Repo relevance analysis          │   │
-│  └──────────────────┬───────────────────────────────────┘   │
-│                     │  Wait 60s                             │
-│  ┌──────────────────▼───────────────────────────────────┐   │
-│  │  TIER 5 — Tracking                  (no LLM)         │   │
-│  │  Follow-up schedule · Status tracking                │   │
-│  └──────────────────┬───────────────────────────────────┘   │
-│                     │  Wait 60s                             │
-│  ┌──────────────────▼───────────────────────────────────┐   │
-│  │  TIER 6 — Tailored Resume           (Groq · 1 call)  │   │
-│  │  Full CV rewrite against real job requirements       │   │
-│  └──────────────────┬───────────────────────────────────┘   │
-│                     │                                       │
-│  ┌──────────────────▼───────────────────────────────────┐   │
-│  │  Merge Results → GitHub Commit → Email Notification  │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                         │
-          ┌──────────────┴───────────────┐
-          ▼                              ▼
-┌──────────────────┐          ┌──────────────────────┐
-│  GitHub (private)│          │  Email Notification  │
-│  job-search-data │          │  (SMTP · Gmail)       │
-│                  │          └──────────────────────┘
-│  Job_Applications│
-│  └── Active/     │
-│      Company.md  │◄── Obsidian Git plugin
-│  Dashboard/      │    auto-pulls every 10 min
-│  My_Materials/   │
-└──────────────────┘
+Job description (form or webhook)
+        |
+   Extract and parse job fields
+        |
+   Tier 1: resume analysis, cover letter, fit score, ATS keywords
+   Tier 2: cold outreach emails, company research, LinkedIn messages
+   Tier 3: skills gap, interview questions, talking points, salary guide
+   Tier 4: fetch my GitHub repos, match them to the role
+   Tier 5: follow-up schedule and status tracking
+   Tier 6: tailored resume
+        |
+   Merge results -> commit to private GitHub repo -> email notification
 ```
 
-### Supporting Workflows
+The tiers run one after another with short waits (15 to 25 seconds) so the free Groq tier does not return rate limit errors. A full run takes a few minutes. That was a deliberate trade: I chose zero cost over speed. The detailed diagram, with every node, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-| Workflow | Trigger | What it does |
+## Workflows
+
+| File | Trigger | What it does |
 |---|---|---|
-| **Email Listener** | Gmail trigger (on receive) | Classifies incoming emails by keyword pattern into: `rejection`, `interview_invite`, `offer`, `acknowledgement`. Detects rejection stage (phone screen / technical / final round) and generates a stage-appropriate response template. Commits an email log entry to the private GitHub repo and sends an email notification with the draft response. |
-| **Follow-Up Scheduler** | 4 cron triggers (9:00 / 9:30 / 10:00 / 10:30) | Each trigger handles one follow-up type only (day_3 / day_7 / day_30 / day_90) — splitting the load so each run stays under Groq's 6000 TPM limit. Reads application files from GitHub, checks which are due today, generates personalized email drafts via Groq, and sends a digest for manual review. Emails are **never auto-sent** to recruiters — human approval required. |
-| **Gmail Auto-Labeler** | Scheduled every 30 min | Fetches inbox messages by message (not thread — different ID format breaks downstream nodes), deduplicates by `threadId` in a Code node running "Run Once for All Items" so `$input.all()` spans all messages. Applies exactly one label per thread based on newest message. Time-based escalation: `FROM RECRUITER` → `NEED TO REPLY` after 12 hrs. Gmail API fields are case-sensitive: `From`, `To` (capital), `labels: [{id, name}]` — not `labelIds`. `isReply` detection uses subject `Re:` prefix only for outgoing emails — using thread labels caused false `REPLIED` on first recruiter outreach. |
+| `workflow-all-tiers.json` | Form or webhook | The main pipeline above |
+| `job-scanner-workflow.json` | Daily schedule | Pulls LinkedIn postings through Apify, skips ones already seen using a Google Sheet, scores new ones with Groq, saves matches above 70 |
+| `workflow-email-listener.json` | New Gmail message | Classifies replies (rejection, interview invite, offer, acknowledgement) and updates the application status |
+| `workflow-followup-scheduler.json` | Four daily cron triggers | Drafts follow-up emails for day 3, 7, 30 and 90. Drafts are sent to me for review, nothing goes to a recruiter automatically |
+| `workflow-gmail-labeler.json` | Every 30 minutes | Labels inbox messages for the job search |
+| `helper-get-label-ids.json` | Manual | One-off helper to look up Gmail label IDs |
 
----
+## Tech stack
 
-## Email Intelligence
-
-The system monitors your job-search Gmail account continuously via two separate workflows.
-
-**Email Listener** fires on every incoming email matching job-search keywords. It classifies the email and branches into three paths:
-
-```
-Incoming email
-      │
-      ▼
- Classify Email ──► Route by Type
-                        │
-          ┌─────────────┼─────────────┐
-          ▼             ▼             ▼
-     Rejection    Interview Invite   Offer
-          │             │             │
-    Detect stage   Log + Notify   Log + Notify
-    (phone/tech/    (action req'd)  (review offer)
-     final round)
-          │
-    Generate stage-aware
-    response template
-          │
-    GitHub commit (Email_Log/)
-          │
-    Email notification
-    with draft response
-```
-
-**Gmail Auto-Labeler** runs every 30 minutes and applies exactly one label per thread based on the most recent message:
-
-| Label | Condition |
+| Part | Choice |
 |---|---|
-| `N8N` | Sent from me to myself (workflow notifications) |
-| `WAITING FOR RESPONSE` | First outreach I sent, no Re: prefix, no prior thread label |
-| `REPLIED` | I replied to an existing thread (subject starts with `Re:`) |
-| `FROM RECRUITER` | Incoming email, within 12-hour window, no reply from me yet |
-| `NEED TO REPLY` | Incoming email, 12-hour window passed without my reply |
+| Orchestration | n8n, self-hosted in Docker |
+| LLM | `openai/gpt-oss-120b` through the Groq API (free tier) |
+| Data store | Private GitHub repo, one Markdown file per application |
+| Duplicate cache | Google Sheets |
+| Job source | Apify (LinkedIn scraper) |
+| Email | Gmail API and SMTP |
+| Demo | Static HTML on GitHub Pages |
+| Optional | Obsidian with the Git plugin, to browse the data locally |
 
-The labeler is 5 nodes: `Every 30 Minutes` → `Fetch Emails` (Gmail) → `Fix Logic` (Code, dedup + classify) → `Clear All` (Gmail, removes old labels) → `Apply Label` (Gmail). The Clear+Apply pattern ensures exactly one label per thread with no stale labels.
+## Design decisions
 
----
+- **GitHub as the data store.** Each application is a Markdown file with YAML frontmatter. I get version history, readable diffs, and it works with Obsidian. The downside is that I cannot query across files without reading them all. A Google Sheet acts as a small cache for the job scanner's duplicate check.
+- **Deduplicate before calling the LLM.** Already-seen jobs are dropped first, so the token budget is only spent on new postings.
+- **Structured output.** Where the workflow needs to parse a result, the request itself sets `response_format: json_object` (not only the prompt wording), and the code validates the result and uses a fallback if it is broken.
+- **Human in the loop.** Anything that would be sent to another person is a draft I approve.
+- **Model:** `openai/gpt-oss-120b` through the Groq API. The model name is set once, in the `Job Input` node, and passed to every step. See the next two sections.
 
-## Tech Stack
+## How the main workflow is structured
 
-| Layer | Technology | Why |
-|---|---|---|
-| **Workflow engine** | n8n (self-hosted, Docker) | Visual graph I can show in interviews; handles retries, scheduling, error routing out of the box |
-| **LLM inference** | Groq API - LLaMA 3.1 8B | Free tier, ~200 tokens/sec, OpenAI-compatible API |
-| **Data store** | GitHub API (private repo) | Version history on every file, human-readable, zero cost, works natively with Obsidian |
-| **Local dashboard** | Obsidian + Dataview | Queries live from `.md` frontmatter — no manual maintenance |
-| **Portfolio demo** | Vanilla HTML/CSS/JS | No framework overhead; SHA-256 password auth via native Web Crypto API |
-| **Deployment** | GitHub Pages | Zero hosting cost, auto-deploys on push |
+- **Prompt building is separate from the API calls.** Each step has a Code node ("Prepare") that builds the prompt and request parameters. The 14 HTTP Request nodes that call Groq are identical and just send what the Prepare node gives them. To change a prompt, a model, or a setting, I edit one Code node and never touch the HTTP nodes.
+- **One place for the model name.** `Job Input` sets `groq_model` and every Prepare node reads it.
+- **JSON mode where I need to parse the output.** The extraction and scoring steps set `response_format: json_object` in the API request and use temperature 0.3. The code validates the result and falls back to a safe default if the JSON is broken, so one bad response does not stop the run. Writing steps use a higher temperature (0.7).
+- **Retries.** The Groq nodes use Retry On Fail (3 tries, 5 seconds apart), mostly to survive 429 rate limit errors, together with the short waits between tiers.
+- **Safe writes to GitHub.** Before writing a file the workflow reads its current SHA (`Get File SHA`, `Get Resume SHA`). If the file exists it is updated, if not it is created, so reruns do not fail with a conflict.
 
----
-## Repo Structure
+## Switching the model
 
-```
-CareerOS/
-├── index.html                          # Portfolio demo (GitHub Pages)
-├── docker-compose.yml                  # n8n local setup
-├── Dockerfile                          # n8n container configuration
-├── Makefile                            # make start / stop / logs / restart
-├── .env.example                        # Environment variables template
-├── .gitignore                          # Git ignore patterns
-│
-├── .github/
-│   └── workflows/
-│       └── deploy.yml                  # CI/CD: validates JSONs + deploys to GitHub Pages
-│
-├── n8n-workflows/
-│   ├── workflow-all-tiers.json         # Main pipeline (6 tiers: resume → portfolio)
-│   ├── workflow-followup-scheduler.json# Daily follow-up digest (4 cron triggers)
-│   ├── workflow-email-listener.json    # Gmail classifier (rejection/invite/offer)
-│   ├── workflow-gmail-labeler.json     # Inbox auto-labeling every 30 min
-│   └── helper-get-label-ids.json       # Helper: fetch Gmail label IDs
-│
-├── prompts/
-│   ├── 01-resume.md                    # Tier 1: Resume analysis prompt
-│   ├── 02-cover-letter.md              # Tier 1: Cover letter prompt
-│   ├── 03-cold-email.md                # Tier 2: Cold outreach prompt
-│   ├── 04-interview-prep.md            # Tier 3: Interview prep prompt
-│   ├── 05-talking-points.md            # Tier 3: Talking points prompt
-│   ├── 06-skills-gap.md                # Tier 3: Skills gap analysis prompt
-│   ├── 07-portfolio-github.md          # Tier 4: Portfolio matching prompt
-│   ├── 08-salary-negotiation.md        # Tier 3: Salary negotiation prompt
-│   └── PROMPTS.md                      # Complete prompts reference (all tiers)
-│
-├── sample-outputs/
-│   ├── sample_application_file.md      # Example: full application with all tiers
-│   ├── sample_resume_analysis.md       # Example: Tier 1 resume analysis output
-│   ├── sample_cover_letter.md          # Example: Tier 1 cover letter output
-│   ├── sample_cold_email.md            # Example: Tier 2 cold outreach output
-│   └── sample_interview_prep.md        # Example: Tier 3 interview prep output
-│
-└── docs/
-    ├── SETUP.md                        # Installation and local setup guide
-    ├── ARCHITECTURE.md                 # System design and data flow diagrams
-    ├── TROUBLESHOOTING.md              # Common issues and debugging guide
-    ├── CHANGELOG.md                    # Version history and feature updates
-    └── OBSIDIAN_SYNC.md                # Obsidian vault integration guide
-```
+The first version used `llama-3.1-8b-instant`. My Groq account no longer had access to it, so I moved the whole system to `openai/gpt-oss-120b`. What changed because of that:
 
----
+- It is a much larger model and a reasoning model, so it follows the structured prompts more reliably, especially the JSON ones.
+- Reasoning models spend part of their output budget on thinking. With the old limits, some answers were cut off, so I raised `max_tokens` (4096 for most steps, 8192 for the longest ones).
+- To avoid wasting that budget on simple tasks, extraction and writing steps use `reasoning_effort: low`.
+- It has different rate limits than the small model, so I retuned the waits between tiers (15 to 25 seconds) and added retries.
+- Moving the model name into one node made this kind of change a one-line edit. The job scanner has its own copy of the model name and has to be updated separately.
+
+## Problems I ran into
+
+- Groq rate limits (HTTP 429): fixed with deduplication, smaller batches, and waits.
+- GitHub 422 and 409 errors when overwriting files: read the file's current SHA first, and write sequentially instead of in parallel.
+- A node dropping the data from earlier nodes: read upstream nodes by name instead of by position.
+- Gmail API field names and thread IDs behaving differently from the docs: work with messages, then deduplicate by thread ID in a Code node.
+
+## Running it
+
+Full steps are in [docs/SETUP.md](docs/SETUP.md). In short:
+
+1. Install Docker, copy `.env.example` to `.env`, and fill it in.
+2. Run `make start` and open `http://localhost:5679`.
+3. Import the workflows from `n8n-workflows/`.
+4. Create two Header Auth credentials: one for Groq (`Bearer <key>`) and one for GitHub (`Bearer <token>`).
+5. In `job-scanner-workflow.json`, replace `YOUR_GOOGLE_SHEET_ID`, `YOUR_APIFY_TOKEN` and the placeholder email addresses.
+6. Create a private repo for the output files and update the repo name in the GitHub nodes.
+
+## Limitations
+
+- Runs locally in Docker, so it only works while my machine is on. A small VPS would fix that.
+- No automated tests for the workflows.
+- No monitoring or alerting.
+- The public demo is a static page with sample data.
 
 ## Documentation
 
-- **[Setup Guide](docs/SETUP.md)** — Installation, prerequisites, and local setup
-- **[Architecture](docs/ARCHITECTURE.md)** — System design, data flow, and component breakdown
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — Common issues, debugging, and real bugs fixed
-- **[Changelog](docs/CHANGELOG.md)** — Version history and feature updates
-- **[Obsidian Integration](docs/OBSIDIAN_SYNC.md)** — Vault setup, Git sync, and Dataview queries
-- **[Prompts Reference](prompts/PROMPTS.md)** — All LLM prompts used in workflows
+- [Setup](docs/SETUP.md): installing, credentials, importing the workflows
+- [Architecture](docs/ARCHITECTURE.md): the full node-by-node flow
+- [Troubleshooting](docs/TROUBLESHOOTING.md): errors I hit and how I fixed them
+- [Obsidian sync](docs/OBSIDIAN_SYNC.md): browsing the data locally
+- [Changelog](docs/CHANGELOG.md)
+- [Prompts](prompts/PROMPTS.md): the prompt for each step
 
----
+## Project structure
 
-## Setup
-
-See **[docs/SETUP.md](docs/SETUP.md)** for full instructions.
-
-Quick start:
-
-```bash
-git clone https://github.com/odeliyach/CareerOS.git
-cd CareerOS
-cp .env.example .env        # fill in your tokens
-make start                  # starts n8n on localhost:5679
+```
+CareerOS/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml            validates the workflow JSONs, deploys the demo
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── CHANGELOG.md
+│   ├── OBSIDIAN_SYNC.md
+│   ├── SETUP.md
+│   └── TROUBLESHOOTING.md
+├── n8n-workflows/
+│   ├── workflow-all-tiers.json
+│   ├── job-scanner-workflow.json
+│   ├── workflow-email-listener.json
+│   ├── workflow-followup-scheduler.json
+│   ├── workflow-gmail-labeler.json
+│   └── helper-get-label-ids.json
+├── prompts/
+│   ├── 01-resume.md
+│   ├── 02-cover-letter.md
+│   ├── 03-cold-email.md
+│   ├── 04-interview-prep.md
+│   ├── 05-talking-points.md
+│   ├── 06-skills-gap.md
+│   ├── 07-portfolio-github.md
+│   ├── 08-salary-negotiation.md
+│   └── PROMPTS.md
+├── .env.example
+├── Dockerfile
+├── docker-compose.yml
+├── Makefile
+├── index.html                    static demo dashboard (GitHub Pages)
+├── PROMPTS.md
+├── LICENSE
+└── README.md
 ```
 
-Then import the workflow JSONs from `n8n-workflows/` via n8n UI → Import from file.
+## License
 
----
-
-
-<div align="center">
-
-Built by **Odeliya Charitonova** · [GitHub](https://github.com/odeliyach) · [LinkedIn](https://linkedin.com/in/odeliya-charitonova)
-
-*Computer Science student @ Tel Aviv University, School of CS & AI*
-
-</div>
+MIT

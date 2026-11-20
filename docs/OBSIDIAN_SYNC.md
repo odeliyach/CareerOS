@@ -131,7 +131,7 @@ Each application's `tracking.md` contains:
 The `workflow-followup-scheduler.json` runs daily at 9 AM and:
 - Reads all `tracking.md` files from GitHub
 - Identifies which follow-ups are due today
-- Generates personalized email drafts via Ollama
+- Generates personalized email drafts via the Groq API
 - Emails you a digest with all action items
 
 ---

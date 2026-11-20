@@ -14,7 +14,7 @@
           "labelIds": [
             "INBOX"
           ],
-          "q": "subject:(application OR interview OR offer OR position OR role OR opportunity OR congratulations OR unfortunately) newer_than:1d -from:odeliya.charitonova.dev@gmail.com"
+          "q": "subject:(application OR interview OR offer OR position OR role OR opportunity OR congratulations OR unfortunately) newer_than:1d -from:YOUR_EMAIL@example.com"
         }
       },
       "id": "12f2f8a4-5c78-418c-8f73-ccc467c345be",
@@ -137,7 +137,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nconst emailType = d.email_type || 'unknown';\nconst logDate = new Date().toISOString().substring(0, 10);\nconst logPath = 'Obsidian_Vault/Email_Log/' + logDate + '-' + emailType + '.md';\n\nconst statusContent =\n  '# Email Log: ' + (d.subject || 'Unknown Subject') + '\\n\\n' +\n  '- **Date:** ' + logDate + '\\n' +\n  '- **From:** ' + (d.from || 'Unknown') + '\\n' +\n  '- **Type:** ' + emailType + '\\n' +\n  '- **Stage:** ' + (d.rejection_stage || 'N/A') + '\\n' +\n  '- **New Status:** Rejected\\n\\n' +\n  '## Response Template\\n\\n' + (d.response_template || 'N/A') + '\\n';\n\nconst contentBase64 = Buffer.from(statusContent).toString('base64');\n\nreturn [{\n  json: {\n    subject: d.subject || '',\n    from: d.from || '',\n    email_type: emailType,\n    rejection_stage: d.rejection_stage || '',\n    company_hint: d.company_hint || '',\n    response_template: d.response_template || '',\n    obsidian_status: 'Rejected',\n    log_path: logPath,\n    log_content_base64: contentBase64,\n    log_commit_message: 'Email log: ' + emailType + ' - ' + (d.subject || '').substring(0, 50)\n  }\n}];"
+        "jsCode": "const d = $input.first().json;\nconst emailType = d.email_type || 'unknown';\nconst logDate = new Date().toISOString().substring(0, 10);\nconst safeCompany = (d.company_hint || 'unknown').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').substring(0, 30) || 'unknown';\nconst logPath = 'Obsidian_Vault/Email_Log/' + logDate + '-' + safeCompany + '-' + emailType + '.md';\n\nconst statusContent =\n  '# Email Log: ' + (d.subject || 'Unknown Subject') + '\\n\\n' +\n  '- **Date:** ' + logDate + '\\n' +\n  '- **From:** ' + (d.from || 'Unknown') + '\\n' +\n  '- **Type:** ' + emailType + '\\n' +\n  '- **Stage:** ' + (d.rejection_stage || 'N/A') + '\\n' +\n  '- **New Status:** Rejected\\n\\n' +\n  '## Response Template\\n\\n' + (d.response_template || 'N/A') + '\\n';\n\nconst contentBase64 = Buffer.from(statusContent).toString('base64');\n\nreturn [{\n  json: {\n    subject: d.subject || '',\n    from: d.from || '',\n    email_type: emailType,\n    rejection_stage: d.rejection_stage || '',\n    company_hint: d.company_hint || '',\n    response_template: d.response_template || '',\n    obsidian_status: 'Rejected',\n    log_path: logPath,\n    log_content_base64: contentBase64,\n    log_commit_message: 'Email log: ' + emailType + ' - ' + (d.subject || '').substring(0, 50)\n  }\n}];"
       },
       "id": "cfaefa41-c552-4728-9620-911ff4f54445",
       "name": "Update Obsidian - Rejected",
@@ -151,7 +151,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "=https://api.github.com/repos/odeliyach/job-search-data/contents/{{ $json.log_path }}",
+        "url": "=https://api.github.com/repos/odeliyach/job-search-data/contents/{{ $('Update Obsidian - Rejected').first().json.log_path }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -168,34 +168,16 @@
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "message",
-              "value": "={{ $json.log_commit_message }}"
-            },
-            {
-              "name": "content",
-              "value": "={{ $json.log_content_base64 }}"
-            },
-            {
-              "name": "author.name",
-              "value": "Odeliya Charitonova"
-            },
-            {
-              "name": "author.email",
-              "value": "odaliya12@gmail.com"
-            }
-          ]
-        },
-        "options": {}
+        "options": {},
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $('Update Obsidian - Rejected').first().json.log_commit_message, content: $('Update Obsidian - Rejected').first().json.log_content_base64, sha: $('Get Email Log SHA').first().json.sha || undefined, author: { name: 'Odeliya Charitonova', email: 'YOUR_EMAIL@example.com' } }) }}"
       },
       "id": "b3ce1c95-b2b6-4c95-9db8-c7a44fcdc33b",
       "name": "GitHub Commit Email Log",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        464,
+        608,
         0
       ],
       "credentials": {
@@ -207,11 +189,11 @@
     },
     {
       "parameters": {
-        "fromEmail": "odeliya.charitonova.dev@gmail.com",
-        "toEmail": "odeliya.charitonova.dev@gmail.com",
-        "subject": "=Job Search Update: Rejection - {{ $json.company_hint }}",
+        "fromEmail": "YOUR_EMAIL@example.com",
+        "toEmail": "YOUR_EMAIL@example.com",
+        "subject": "=Job Search Update: Rejection - {{ $('Update Obsidian - Rejected').first().json.company_hint }}",
         "emailFormat": "html",
-        "html": "=<html><body style=\"font-family: Arial, sans-serif; padding: 20px;\"><h2 style=\"color: #dc3545;\">Rejection Received</h2><p><strong>Company:</strong> {{ $json.company_hint }}</p><p><strong>Stage:</strong> {{ $json.rejection_stage }}</p><p><strong>Subject:</strong> {{ $json.subject }}</p><hr/><h3>Suggested Response</h3><pre style=\"background:#f8f9fa;padding:15px;border-radius:5px;\">{{ $json.response_template }}</pre><p><em>GitHub log: {{ $json.log_path }}</em></p><p><em>Status: {{ $json.obsidian_update }}</em></p></body></html>",
+        "html": "=<html><body style=\"font-family: Arial, sans-serif; padding: 20px;\"><h2 style=\"color: #dc3545;\">Rejection Received</h2><p><strong>Company:</strong> {{ $('Update Obsidian - Rejected').first().json.company_hint }}</p><p><strong>Stage:</strong> {{ $('Update Obsidian - Rejected').first().json.rejection_stage }}</p><p><strong>Subject:</strong> {{ $('Update Obsidian - Rejected').first().json.subject }}</p><hr/><h3>Suggested Response</h3><pre style=\"background:#f8f9fa;padding:15px;border-radius:5px;\">{{ $('Update Obsidian - Rejected').first().json.response_template }}</pre><p><em>GitHub log: {{ $('Update Obsidian - Rejected').first().json.log_path }}</em></p><p><em>Status: {{ $('Update Obsidian - Rejected').first().json.obsidian_status }}</em></p></body></html>",
         "options": {}
       },
       "id": "6ab8211a-e6da-4a92-ae53-8324eb6897e6",
@@ -219,7 +201,7 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
       "position": [
-        608,
+        800,
         0
       ],
       "webhookId": "3db9c8d8-11d8-4092-a4a6-d3fa0fb3602f",
@@ -245,8 +227,8 @@
     },
     {
       "parameters": {
-        "fromEmail": "odeliya.charitonova.dev@gmail.com",
-        "toEmail": "odeliya.charitonova.dev@gmail.com",
+        "fromEmail": "YOUR_EMAIL@example.com",
+        "toEmail": "YOUR_EMAIL@example.com",
         "subject": "=Interview Invite: {{ $json.company_hint }} - Schedule NOW",
         "emailFormat": "html",
         "html": "=<html><body style=\"font-family: Arial, sans-serif; padding: 20px;\"><h2 style=\"color: #28a745;\">Interview Invite Received!</h2><p><strong>Company:</strong> {{ $json.company_hint }}</p><p><strong>Subject:</strong> {{ $json.subject }}</p><p style=\"background:#d4edda;padding:15px;border-radius:5px;\"><strong>Action Required:</strong> Reply to schedule interview ASAP.</p></body></html>",
@@ -283,8 +265,8 @@
     },
     {
       "parameters": {
-        "fromEmail": "odeliya.charitonova.dev@gmail.com",
-        "toEmail": "odeliya.charitonova.dev@gmail.com",
+        "fromEmail": "YOUR_EMAIL@example.com",
+        "toEmail": "YOUR_EMAIL@example.com",
         "subject": "=OFFER RECEIVED: {{ $json.company_hint }} - Review Immediately",
         "emailFormat": "html",
         "html": "=<html><body style=\"font-family: Arial, sans-serif; padding: 20px;\"><h2 style=\"color: #007bff;\">Offer Received!</h2><p><strong>Company:</strong> {{ $json.company_hint }}</p><p><strong>Subject:</strong> {{ $json.subject }}</p><p style=\"background:#cce5ff;padding:15px;border-radius:5px;\"><strong>Review the offer carefully. Use Prompt #8 (Salary Negotiation) for guidance.</strong></p></body></html>",
@@ -316,6 +298,47 @@
         0,
         608
       ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/odeliyach/job-search-data/contents/{{ $json.log_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-search"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "e1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
+      "name": "Get Email Log SHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nriQcBdVr3dXV5me",
+          "name": "Header Auth account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -382,7 +405,7 @@
       "main": [
         [
           {
-            "node": "GitHub Commit Email Log",
+            "node": "Get Email Log SHA",
             "type": "main",
             "index": 0
           }
@@ -416,6 +439,17 @@
         [
           {
             "node": "Notify - Rejection Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Email Log SHA": {
+      "main": [
+        [
+          {
+            "node": "GitHub Commit Email Log",
             "type": "main",
             "index": 0
           }

@@ -1,0 +1,552 @@
+{
+  "name": "Job Scanner (Phase 4)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "8a1ddf90-ddd8-45fa-906d-8295e0d13271",
+      "name": "Schedule (8:00 AM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1344,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/actor-tasks/jR7d0eQ2ghKgGH5dQ/run-sync-get-dataset-items?token=YOUR_APIFY_TOKEN",
+        "options": {}
+      },
+      "id": "b710687a-5b89-4506-80f4-fb2ff241252a",
+      "name": "Fetch LinkedIn Jobs (Apify)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -1120,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet jobs = [];\n\nif (items.length === 1 && Array.isArray(items[0].json)) {\n    jobs = items[0].json;\n} else if (items.length === 1 && items[0].json.items && Array.isArray(items[0].json.items)) {\n    jobs = items[0].json.items;\n} else {\n    jobs = items.map(item => item.json);\n}\n\nif (jobs.length === 0) {\n    return [{json: {id: 'error', company: 'No Data', title: 'No Title', description: 'Empty', url: ''}}];\n}\n\n// רק השורה הבאה השתנתה: הוספתי slice(0, 2) כדי לחתוך אך ורק ל-2 משרות\nreturn jobs.slice(0, 101).map(j => ({\n    json: {\n        id: j.id || j.jobId || Math.random().toString(36).substr(2,9),\n        company: j.company || j.companyName || 'Unknown Company',\n        title: j.title || j.positionName || 'Unknown Title',\n        \n        // התיקון הקריטי: שואב את descriptionText שהאקטור מחזיר!\n        description: j.descriptionText || j.description || j.jobDescription || 'No description found',\n        \n        // התיקון הקריטי השני: שואב את applyUrl או בונה קישור מזהה\n        url: j.applyUrl || j.linkedinUrl || j.url || ('https://www.linkedin.com/jobs/view/' + j.id)\n    }\n}));\n"
+      },
+      "id": "b4eb2741-7cfb-489d-8cb1-34948cf144cf",
+      "name": "Parse Intermediary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'openai/gpt-oss-120b',\n  reasoning_effort: 'low',\n  response_format: { type: 'json_object' },\n  messages: [\n    {\n      role: 'system',\n      content: 'You evaluate job postings for a Junior or CS Student specializing in Backend (Python/Java/C), Systems Programming, ML, and NLP. \\n\\nTARGET ROLES: Systems Engineer, Backend Developer, ML Engineer, NLP Researcher, AI Engineer, MLOps, Low-level optimization.\\n\\nREJECT AND GIVE A SCORE OF 0 IF:\\n- Job explicitly requires 3+ years of full-time experience.\\n- Pure Frontend/UI/Mobile role.\\n- Text is in a foreign language (not English or Hebrew).\\n- Located strictly outside Israel (unless remote for Israel).\\n\\nOtherwise, score 1-100 based on technical match. Return ONLY JSON: {\"match_score\": number, \"reason\": \"brief evaluation\", \"location\": \"string\", \"experience_level\": \"string\", \"key_requirements\": \"string\"}'\n    },\n    {\n      role: 'user',\n      content: `Job: ${$json.title} at ${$json.company}\\nDesc: ${$json.description}`\n    }\n  ],\n  temperature: 0.1,\n  max_tokens: 2048\n}) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 20000
+            }
+          }
+        }
+      },
+      "id": "779cea8a-39ef-489b-86ed-08f63e0c071f",
+      "name": "Groq Evaluate Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -672,
+        96
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EV5TtLlrpZapy6WQ",
+          "name": "Header Auth account 2"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const groqOut = $input.item.json?.choices?.[0]?.message?.content || '{}';\nlet score = 0;\nlet parsed = {};\n\ntry {\n  parsed = JSON.parse(groqOut.replace(/```json/g, '').replace(/```/g, '').trim());\n  score = Number(parsed.match_score) || 0;\n} catch(e) {}\n\nconst toStr = (val) => {\n  if (val == null) return '';\n  if (Array.isArray(val)) return val.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');\n  if (typeof val === 'object') return JSON.stringify(val);\n  return String(val);\n};\n\nconst loc = toStr(parsed.location);\n\n// AI Safeguard: if the AI explicitly stated a foreign location (e.g. Denmark) but forgot to set 0, force it\nif (loc && !loc.toLowerCase().includes('israel') && loc.toLowerCase() !== 'remote') {\n  if (loc.toLowerCase().includes('danmark') || loc.toLowerCase().includes('denmark')) {\n    score = 0;\n  }\n}\n\nconst companyName = $('Filter New Jobs Only').item.json.company || 'Unknown';\nconst jobTitle = $('Filter New Jobs Only').item.json.title || 'Unknown';\nconst jobUrl = $('Filter New Jobs Only').item.json.url || '';\n\nconst markdown = \"---\\ncompany: \\\"\" + companyName + \"\\\"\\nrole: \\\"\" + jobTitle + \"\\\"\\nstatus: \\\"lead\\\"\\njob_link: \\\"\" + jobUrl + \"\\\"\\n---\\n\";\n\nreturn { json: {\n  company_name: companyName,\n  job_title: jobTitle,\n  job_url: jobUrl,\n  match_score: score,\n  reason: toStr(parsed.reason),\n  location: loc,\n  experience_level: toStr(parsed.experience_level),\n  requirements: toStr(parsed.key_requirements),\n  applied_date: new Date().toISOString().split('T')[0],\n  file_content_b64: Buffer.from(markdown).toString('base64').replace(/\\s/g, '')\n}};\n"
+      },
+      "id": "46b57637-261f-41ea-b607-0b8391ff8749",
+      "name": "Extract Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.match_score }}",
+              "operation": "largerEqual",
+              "value2": 60
+            }
+          ]
+        }
+      },
+      "id": "9251a437-7813-4c1c-a867-7a1c6a290457",
+      "name": "Filter Matches > 70",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.github.com/repos/odeliyach/job-search-data/contents/Job_Leads/' + $json.company_name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.md' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-search"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9fa0740e-25c1-4bc2-b51b-9ad39b1ade73",
+      "name": "GitHub GET SHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nriQcBdVr3dXV5me",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://api.github.com/repos/odeliyach/job-search-data/contents/Job_Leads/' + $('Filter Matches > 70').item.json.company_name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.md' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-job-search"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Add job lead ' + $('Filter Matches > 70').item.json.company_name, content: $('Filter Matches > 70').item.json.file_content_b64, author: { name: 'Odeliya Charitonova', email: 'YOUR_EMAIL@example.com' } }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        }
+      },
+      "id": "0f0586b1-918e-4273-98d8-be6170e653f6",
+      "name": "GitHub Save File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        256,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nriQcBdVr3dXV5me",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "YOUR_EMAIL@example.com",
+        "toEmail": "YOUR_EMAIL@example.com",
+        "subject": "New CareerOS Job Match!",
+        "text": "=Match: {{ $('Filter Matches > 70').item.json.company_name }}\nURL: {{ $('Filter Matches > 70').item.json.job_url }}\n",
+        "options": {}
+      },
+      "id": "4fd91c3c-28f1-4a2e-a6ba-35b3c0253221",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        64,
+        496
+      ],
+      "webhookId": "b79a019b-f858-4ba8-be83-93104e495108",
+      "credentials": {
+        "smtp": {
+          "id": "iQMNzIMVnxiFJYWF",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "גיליון1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Reason": "={{ $json.reason }}",
+            "Experience level": "={{ $json.experience_level }}",
+            "Date": "={{ $json.applied_date }}",
+            "Company": "={{ $json.company_name }}",
+            "Title": "={{ $json.job_title }}",
+            "Score": "={{ $json.match_score }}",
+            "Location": "={{ $json.location }}",
+            "Requirements": "={{ $json.requirements }}",
+            "URL": "={{ $json.job_url }}"
+          },
+          "matchingColumns": [
+            "URL"
+          ],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Experience level",
+              "displayName": "Experience level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Requirements",
+              "displayName": "Requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -336,
+        320
+      ],
+      "id": "30f0da41-f393-4399-b7df-2ebcd80635a2",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "BXpGaetSxxxjbtyY",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "גיליון1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "c34ee5ad-31cc-4093-b2d7-b93ab54ca309",
+      "name": "Get Seen Jobs (Sheet)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1120,
+        320
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "BXpGaetSxxxjbtyY",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const apifyJobs = $('Parse Intermediary').all();\nconst sheetRows = $('Get Seen Jobs (Sheet)').all();\n\nconst seenUrls = new Set(\n  sheetRows.map(r => r.json.URL).filter(Boolean)\n);\n\nconst newJobs = apifyJobs.filter(job => job.json.id !== 'error' && !seenUrls.has(job.json.url));\n\n// Return empty array so n8n stops cleanly without wasting a Groq API call\nif (newJobs.length === 0) {\n  return [];\n}\n\nreturn newJobs;\n"
+      },
+      "id": "806b0660-9a3e-4413-98e1-e6ecbb215d79",
+      "name": "Filter New Jobs Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        432
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule (8:00 AM)": {
+      "main": [
+        [
+          {
+            "node": "Fetch LinkedIn Jobs (Apify)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch LinkedIn Jobs (Apify)": {
+      "main": [
+        [
+          {
+            "node": "Parse Intermediary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Intermediary": {
+      "main": [
+        [
+          {
+            "node": "Get Seen Jobs (Sheet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Seen Jobs (Sheet)": {
+      "main": [
+        [
+          {
+            "node": "Filter New Jobs Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Jobs Only": {
+      "main": [
+        [
+          {
+            "node": "Groq Evaluate Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Evaluate Job": {
+      "main": [
+        [
+          {
+            "node": "Extract Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Score": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter Matches > 70",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Matches > 70": {
+      "main": [
+        [
+          {
+            "node": "GitHub GET SHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub GET SHA": {
+      "main": [
+        [],
+        [
+          {
+            "node": "GitHub Save File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Save File": {
+      "main": [
+        [
+          {
+            "node": "Send Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "1fd707c6-afbe-4921-8166-16e7e9b7f5e4",
+  "meta": {
+    "instanceId": "23203e1a41391fea8f8c4fa4ef17097cd293961eaa4c691acf21932d52a39dfe"
+  },
+  "id": "CaMQi1JWqDT67a2J",
+  "tags": []
+}

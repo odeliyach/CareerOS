@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CareerOS — Job Intelligence System</title>
+<title>CareerOS, Job Intelligence System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <style>
@@ -244,10 +244,10 @@ textarea::placeholder{color:var(--text-dim)}
       <span id="modeBadge" class="m-badge mb-sample">sample</span>
     </div>
     <div class="m-grid">
-      <div class="m-card"><div class="m-val c-rose" id="mT">—</div><div class="m-lbl">Applications</div><div class="m-sub">this cycle</div></div>
-      <div class="m-card"><div class="m-val c-sage" id="mA">—</div><div class="m-lbl">Active</div><div class="m-sub">in pipeline</div></div>
-      <div class="m-card"><div class="m-val" id="mF">—</div><div class="m-lbl">Avg Fit</div><div class="m-sub">across roles</div></div>
-      <div class="m-card"><div class="m-val c-lav" id="mFU">—</div><div class="m-lbl">Follow-ups</div><div class="m-sub">due this week</div></div>
+      <div class="m-card"><div class="m-val c-rose" id="mT">-</div><div class="m-lbl">Applications</div><div class="m-sub">this cycle</div></div>
+      <div class="m-card"><div class="m-val c-sage" id="mA">-</div><div class="m-lbl">Active</div><div class="m-sub">in pipeline</div></div>
+      <div class="m-card"><div class="m-val" id="mF">-</div><div class="m-lbl">Avg Fit</div><div class="m-sub">across roles</div></div>
+      <div class="m-card"><div class="m-val c-lav" id="mFU">-</div><div class="m-lbl">Follow-ups</div><div class="m-sub">due this week</div></div>
     </div>
     <div class="lbl" style="font-size:10px;">Stage Funnel</div>
     <div class="funnel-row" id="fRow"></div>
@@ -314,7 +314,7 @@ textarea::placeholder{color:var(--text-dim)}
       <button class="btn" id="aBtn" onclick="runAnalysis()">Analyze Role</button>
       <div class="term" id="termOut"><span class="t-dim">// awaiting input…</span></div>
       <div class="result" id="resCard">
-        <div class="r-score" id="rScore">—</div>
+        <div class="r-score" id="rScore">-</div>
         <div class="r-sub">Fit Score</div>
         <div class="tag-row" id="rTags"></div>
       </div>
@@ -546,7 +546,7 @@ function setFilter(stage) {
 }
 
 function renderTable(apps){
-  // Apply filter first, then sort — WHY this order: filter reduces the set,
+  // Apply filter first, then sort, WHY this order: filter reduces the set,
   // sort is cheaper on a smaller array, and the user sees filtered+sorted result
   let rows = apps.slice();
   if (currentFilter !== 'all') rows = rows.filter(a => a.stage === currentFilter);
@@ -643,7 +643,7 @@ const STEPS=[
 ];
 
 // Extracts plausible keywords from the JD text so the simulated result
-// looks tailored to what was pasted, not generic — important for demos
+// looks tailored to what was pasted, not generic, important for demos
 function generateSimulatedResult(jd){
   const text=jd.toLowerCase();
   const allSkills=['Python','FastAPI','REST APIs','SQL','Git','Docker','PostgreSQL','Redis','Node.js','TypeScript','React','AWS','GCP','Kubernetes','System Design','CI/CD','Linux','Microservices','MongoDB','GraphQL'];
@@ -662,22 +662,22 @@ async function runAnalysis(){
   term.innerHTML='';card.classList.remove('show');
   STEPS.forEach(s=>setTimeout(()=>{term.innerHTML+=`<div class="tl ${s.cls}">${s.text}</div>`;term.scrollTop=term.scrollHeight;},s.d));
 
-  // WHY fire-and-forget: the n8n workflow takes 30-90s to run — far too long
+  // WHY fire-and-forget: the n8n workflow takes 30-90s to run, far too long
   // to block the UI. We fire the webhook immediately (triggering the real pipeline
   // in the background on your local machine), then show a simulated result in the
   // demo so the interview experience stays smooth regardless of network/n8n status.
-  // The actual output lands in GitHub as usual — the demo just doesn't wait for it.
+  // The actual output lands in GitHub as usual, the demo just doesn't wait for it.
   if(CFG.WEBHOOK !== 'YOUR_N8N_WEBHOOK_URL'){
     fetch(CFG.WEBHOOK,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({job_description:jd})
-    }).catch(()=>{}); // intentionally ignored — fire and forget
+    }).catch(()=>{}); // intentionally ignored, fire and forget
   }
 
   // Always show simulated result in the demo UI after the terminal animation
   setTimeout(()=>{
-    term.innerHTML+=`<div class="tl t-lav">  Pipeline triggered — results saved to GitHub</div>`;
+    term.innerHTML+=`<div class="tl t-lav">  Pipeline triggered, results saved to GitHub</div>`;
     showResult(generateSimulatedResult(jd));
     btn.disabled=false;btn.textContent='Analyze Role';btn.classList.remove('running');
   },5100);

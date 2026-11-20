@@ -1,4 +1,4 @@
-# CareerOS — Makefile
+# CareerOS, Makefile
 # Usage: make start | make stop | make logs | make restart
 
 .PHONY: start stop logs restart status

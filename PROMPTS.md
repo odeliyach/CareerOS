@@ -1,11 +1,11 @@
-# Ollama Prompts - Job Search Automation
+# Prompts - Job Search Automation
 
-All prompts used by the N8N workflow when calling the Ollama API at `http://ollama:11434`.  
+All prompts used by the N8N workflow when calling the Groq API.  
 Variables shown as `${VARIABLE_NAME}` are substituted at runtime from the parsed job data.
 
 ---
 
-## Tier 1 — Core Application
+## Tier 1, Core Application
 
 ### Resume Generation
 
@@ -43,7 +43,7 @@ Write a compelling cover letter for ${COMPANY_NAME} ${JOB_TITLE} position. Show 
 
 ---
 
-## Tier 2 — Cold Outreach
+## Tier 2, Cold Outreach
 
 ### Introduction Email
 
@@ -112,7 +112,7 @@ Identify personal connection angles for contacting ${COMPANY_NAME} for ${JOB_TIT
 
 ---
 
-## Tier 3 — Interview Preparation
+## Tier 3, Interview Preparation
 
 ### Skills Gap Analysis
 
@@ -185,7 +185,7 @@ Research salary standards for ${JOB_TITLE} in ${LOCATION}. Provide: median salar
 
 ---
 
-## Tier 4 — Portfolio Matching
+## Tier 4, Portfolio Matching
 
 ### Project Selection
 
@@ -211,7 +211,7 @@ From user's GitHub (username: odeliyach), identify and select the 5 projects mos
 For the selected projects, create quantifiable metrics showing impact. For each project include: performance improvements (%, ms, throughput), user growth metrics, cost savings, engagement metrics, scalability metrics, code quality metrics. Use specific numbers and percentages.
 ```
 
-**Variables:** None — follows Project Selection naturally.
+**Variables:** None, follows Project Selection naturally.
 
 **Output file:** `portfolio_matching.md` (Metrics section)
 
@@ -224,7 +224,7 @@ For the selected projects, create quantifiable metrics showing impact. For each 
 For each selected project provide: original objectives/problem solved, technical challenges faced, your specific role and responsibilities, technologies/tools used, impact achieved, lessons learned. Be detailed and business-focused.
 ```
 
-**Variables:** None — follows Project Selection naturally.
+**Variables:** None, follows Project Selection naturally.
 
 **Output file:** `portfolio_matching.md` (Project Context section)
 
@@ -256,4 +256,4 @@ To change a prompt, edit the corresponding Code node in the N8N workflow:
 4. Edit the prompt text
 5. Save the workflow
 
-> **Tip:** Keep `${jobData.field_name}` references intact — they pull from your job details automatically.
+> **Tip:** Keep `${jobData.field_name}` references intact, they pull from your job details automatically.

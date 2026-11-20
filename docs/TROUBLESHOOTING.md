@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Real bugs hit during development — and how they were fixed.
+Real bugs hit during development, and how they were fixed.
 
 ---
 
@@ -66,7 +66,7 @@ const tier1 = $('Tier 1 - Core Application').first().json;
 
 **Cause:** `immediatelyAfter` is not a valid `responseMode` value in this version of n8n.
 
-**Fix:** Remove the `responseMode` parameter entirely from the Webhook node — n8n uses `lastNode` by default.
+**Fix:** Remove the `responseMode` parameter entirely from the Webhook node, n8n uses `lastNode` by default.
 
 ---
 
@@ -76,7 +76,7 @@ const tier1 = $('Tier 1 - Core Application').first().json;
 
 **Cause:** Code node references `$('Job Form')` as a fallback, but n8n throws (not returns null) when referencing a node that didn't run in this execution path.
 
-**Fix:** Remove the `|| $('Job Form').first().json['Job Description']` fallback. The `Job Input` Set node normalizes field names from both trigger sources — downstream nodes only need to read `$('Job Input')`.
+**Fix:** Remove the `|| $('Job Form').first().json['Job Description']` fallback. The `Job Input` Set node normalizes field names from both trigger sources, downstream nodes only need to read `$('Job Input')`.
 
 ---
 
@@ -109,10 +109,10 @@ if (typeFilter) followupsNeeded = followupsNeeded.filter(f => f.followup_type ==
 
 **Fix:** Use subject `Re:` prefix only for `isReply` detection on outgoing emails:
 ```js
-// Wrong — thread labels cause false positives
+// Wrong, thread labels cause false positives
 const isReply = threadHasJobLabel;
 
-// Correct — only trust the subject prefix for outgoing emails
+// Correct, only trust the subject prefix for outgoing emails
 const isReply = subject.startsWith('re:');
 ```
 
@@ -120,9 +120,9 @@ const isReply = subject.startsWith('re:');
 
 ## Gmail API: case-sensitive field names cause silent failures
 
-**Symptom:** Email classification produces wrong results — `from`, `to`, `subject` fields read as empty even when the email has them.
+**Symptom:** Email classification produces wrong results, `from`, `to`, `subject` fields read as empty even when the email has them.
 
-**Cause:** Gmail API returns `From`, `To`, `Subject` with capital letters, and `labels` as an array of `{id, name}` objects — not `labelIds`. Code expecting lowercase keys or a flat `labelIds` array silently gets `undefined`.
+**Cause:** Gmail API returns `From`, `To`, `Subject` with capital letters, and `labels` as an array of `{id, name}` objects, not `labelIds`. Code expecting lowercase keys or a flat `labelIds` array silently gets `undefined`.
 
 **Fix:** Always use capital field names and map the labels array:
 ```js
@@ -137,11 +137,11 @@ const labelIds = (item.labels || []).map(l => l.id);  // not item.labelIds
 
 **Symptom:** Nodes after the Gmail node stop receiving data or throw ID-related errors after switching from message to thread fetch mode.
 
-**Cause:** The Gmail node's thread resource returns a different ID format than the message resource. Downstream nodes (Clear All, Apply Label) were built expecting message IDs — thread IDs are not interchangeable.
+**Cause:** The Gmail node's thread resource returns a different ID format than the message resource. Downstream nodes (Clear All, Apply Label) were built expecting message IDs, thread IDs are not interchangeable.
 
 **Fix:** Keep fetching by message, then deduplicate by `threadId` in the `Fix Logic` Code node. Run the node in "Run Once for All Items" mode so `$input.all()` has access to all messages for deduplication in a single pass:
 ```js
-// Fix Logic node — mode: "Run Once for All Items"
+// Fix Logic node, mode: "Run Once for All Items"
 const items = $input.all();
 // group by threadId, keep newest message per thread
 const byThread = {};
@@ -189,10 +189,10 @@ const minute = now.getMinutes();
 
 **Symptom:** Workflows using Wait nodes complete only the first part and then silently stop. Scheduled triggers (cron) don't fire at their expected time.
 
-**Cause:** Render's free tier puts the container to sleep after ~15 minutes of inactivity. When it wakes up, n8n starts fresh with no execution state. Wait nodes work by saving execution state and resuming later — if the container sleeps between the pause and the resume, that state is gone. Scheduled triggers need a running process to fire — if the container is asleep at 9:00am, the trigger simply doesn't run.
+**Cause:** Render's free tier puts the container to sleep after ~15 minutes of inactivity. When it wakes up, n8n starts fresh with no execution state. Wait nodes work by saving execution state and resuming later, if the container sleeps between the pause and the resume, that state is gone. Scheduled triggers need a running process to fire, if the container is asleep at 9:00am, the trigger simply doesn't run.
 
-**Why this matters for this project specifically:** The main workflow has 8+ wait nodes (30–60 seconds each) spread across the tier chain. The follow-up scheduler has 4 cron triggers. The Gmail labeler runs every 30 minutes. None of these work reliably on a free-tier host that sleeps.
+**Why this matters for this project specifically:** The main workflow has 8+ wait nodes (15 to 25 seconds each) spread across the tier chain. The follow-up scheduler has 4 cron triggers. The Gmail labeler runs every 30 minutes. None of these work reliably on a free-tier host that sleeps.
 
-**Fix:** Run n8n locally on Docker (`docker compose up -d`) so the process stays permanently alive as long as the machine is on. The tradeoff is the webhook is only accessible while your laptop is running — which is fine for personal use.
+**Fix:** Run n8n locally on Docker (`docker compose up -d`) so the process stays permanently alive as long as the machine is on. The tradeoff is the webhook is only accessible while your laptop is running, which is fine for personal use.
 
-**Correct cloud fix (when needed):** Render paid tier, a DigitalOcean Droplet (~$6/month), or Railway — any host that keeps the container permanently alive without sleep periods.
+**Correct cloud fix (when needed):** Render paid tier, a DigitalOcean Droplet (~$6/month), or Railway, any host that keeps the container permanently alive without sleep periods.

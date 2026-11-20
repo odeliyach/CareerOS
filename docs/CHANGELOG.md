@@ -4,12 +4,12 @@ All notable changes to CareerOS, in reverse chronological order.
 
 ---
 
-## Phase 3 — Portfolio Demo
+## Phase 3, Portfolio Demo
 
 ### Added
-- `index.html` — single-page dashboard with particle loader, aurora background, animated funnel, weekly chart, application table with sort/filter, follow-up panel
-- Password authentication via SHA-256 (Web Crypto API — no library)
-- Live/Sample toggle — unlocks Analyze panel and fires real n8n webhook
+- `index.html`, single-page dashboard with particle loader, aurora background, animated funnel, weekly chart, application table with sort/filter, follow-up panel
+- Password authentication via SHA-256 (Web Crypto API, no library)
+- Live/Sample toggle, unlocks Analyze panel and fires real n8n webhook
 - Webhook integration: `POST /webhook/job-search-demo` triggers main pipeline
 - Terminal animation simulates pipeline steps; simulated result card always renders regardless of webhook status (fire-and-forget)
 - X button and click-outside-to-dismiss on auth modal
@@ -18,14 +18,14 @@ All notable changes to CareerOS, in reverse chronological order.
 - GitHub Actions CI: validates workflow JSONs on push, auto-deploys to Pages
 
 ### Fixed
-- `responseMode: 'immediatelyAfter'` not valid in this n8n version — removed parameter
-- CORS errors when opening HTML from `file://` — added `N8N_CORS_ALLOWED_ORIGINS=*` to docker-compose
-- Webhook receiving `job_description` but workflow expecting `job_description_raw` — fixed field name in fetch call
-- `$('Job Form')` throws (not returns null) when workflow triggered via webhook — removed fallback reference, normalized in `Job Input` Set node
+- `responseMode: 'immediatelyAfter'` not valid in this n8n version, removed parameter
+- CORS errors when opening HTML from `file://`, added `N8N_CORS_ALLOWED_ORIGINS=*` to docker-compose
+- Webhook receiving `job_description` but workflow expecting `job_description_raw`, fixed field name in fetch call
+- `$('Job Form')` throws (not returns null) when workflow triggered via webhook, removed fallback reference, normalized in `Job Input` Set node
 
 ---
 
-## Phase 2d — Gmail Auto-Labeling
+## Phase 2d, Gmail Auto-Labeling
 
 ### Added
 - Scheduled workflow (every 30 min) classifying all inbox threads
@@ -34,30 +34,30 @@ All notable changes to CareerOS, in reverse chronological order.
 - Clear-then-Apply pattern: removes all job labels before applying new one (prevents label accumulation)
 
 ### Fixed
-- False `REPLIED` on first recruiter outreach — switched `isReply` detection to subject `Re:` prefix only (was: checking thread labels, which caused false positives when thread already had `FROM_RECRUITER`)
-- Gmail API silent failures — field names are case-sensitive: `From`, `To`, `Subject`, `labels: [{id, name}]` not `labelIds`
-- Switching to thread resource broke downstream nodes — kept message fetch, added `threadId` deduplication in Code node
+- False `REPLIED` on first recruiter outreach, switched `isReply` detection to subject `Re:` prefix only (was: checking thread labels, which caused false positives when thread already had `FROM_RECRUITER`)
+- Gmail API silent failures, field names are case-sensitive: `From`, `To`, `Subject`, `labels: [{id, name}]` not `labelIds`
+- Switching to thread resource broke downstream nodes, kept message fetch, added `threadId` deduplication in Code node
 - `Fix Logic` node must run in "Run Once for All Items" mode for `$input.all()` to span all messages in one pass
 
 ---
 
-## Phase 2b — Follow-Up Scheduler
+## Phase 2b, Follow-Up Scheduler
 
 ### Added
 - Daily digest workflow generating personalized follow-up email drafts
 - 4 follow-up types: day_3, day_7, day_30, day_90
-- Drafts sent to owner for manual review — never auto-sent to recruiters
+- Drafts sent to owner for manual review, never auto-sent to recruiters
 - Groq API replacing local Ollama (speed + no GPU requirement)
 
 ### Fixed
-- All items processed instead of just today's — `// TEMP TEST` comment was bypassing `=== today` date filter; restored and added time-based type filter
-- `now is not defined` — `today` was declared as a string at top of node; `now` as a Date object was never declared; added `const now = new Date()` before the filter block
-- Rate limit crashes — split workflow into 4 triggers (9:00/9:30/10:00/10:30), one per follow-up type; added 2-minute wait between items
-- `$helpers.httpRequest()` deprecated in n8n v1 — replaced with HTTP Request nodes using stored credentials
+- All items processed instead of just today's, `// TEMP TEST` comment was bypassing `=== today` date filter; restored and added time-based type filter
+- `now is not defined`, `today` was declared as a string at top of node; `now` as a Date object was never declared; added `const now = new Date()` before the filter block
+- Rate limit crashes, split workflow into 4 triggers (9:00/9:30/10:00/10:30), one per follow-up type; added 2-minute wait between items
+- `$helpers.httpRequest()` deprecated in n8n v1, replaced with HTTP Request nodes using stored credentials
 
 ---
 
-## Phase 2a — Email Listener
+## Phase 2a, Email Listener
 
 ### Added
 - Gmail Trigger workflow detecting rejections, interview invites, and offers
@@ -67,14 +67,14 @@ All notable changes to CareerOS, in reverse chronological order.
 - Email notification with draft response
 
 ### Fixed
-- Gmail Trigger self-email loop — n8n workflow notifications (sent to self) were being classified as recruiter emails; added `-from:` filter on trigger and explicit `fromEmail === toEmail` check in classification
-- Classify Email JSON structure error — fixed field mapping
+- Gmail Trigger self-email loop, n8n workflow notifications (sent to self) were being classified as recruiter emails; added `-from:` filter on trigger and explicit `fromEmail === toEmail` check in classification
+- Classify Email JSON structure error, fixed field mapping
 - `$helpers.httpRequest()` → HTTP Request node with stored credential for GitHub commit
-- `...data` spread on unknown objects — replaced with explicit field mapping throughout
+- `...data` spread on unknown objects, replaced with explicit field mapping throughout
 
 ---
 
-## Phase 1 — Core Workflow
+## Phase 1, Core Workflow
 
 ### Added
 - Main pipeline: Form Trigger → 6 tiers → GitHub commit → email notification

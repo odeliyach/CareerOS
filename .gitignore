@@ -25,7 +25,7 @@ desktop.ini
 *.sqlite
 *.sqlite3
 
-# Private vault data (job applications — goes to job-search-data PRIVATE repo)
+# Private vault data (job applications, goes to job-search-data PRIVATE repo)
 vault/
 
 # N8N execution data
@@ -59,3 +59,7 @@ temp/
 *.log
 *.bak
 *.backup
+
+# Build output and archives
+dist/
+*.zip
