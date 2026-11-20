@@ -4,6 +4,24 @@ All notable changes to CareerOS, in reverse chronological order.
 
 ---
 
+## v2.0, Job Scanner and Hardening
+
+### Added
+- `job-scanner-workflow.json`: daily scan of LinkedIn postings through Apify, duplicate check against a Google Sheet, Groq scoring, matches above 70 saved to GitHub
+- Enforced JSON mode (`response_format: json_object`) with validation and a fallback for job field extraction and the fit score
+- Retry On Fail (3 tries, 5 seconds apart) on the Groq HTTP nodes
+- SHA lookup before every GitHub write (`Get File SHA`, `Get Resume SHA`, `Dashboard - Get SHA`)
+
+### Changed
+- Model moved from `llama-3.1-8b-instant` to `openai/gpt-oss-120b`, set once in the `Job Input` node
+- Prompt and request building moved into "Prepare" Code nodes, so the 14 Groq HTTP nodes are identical and generic
+- `reasoning_effort: low` for extraction and writing steps, higher `max_tokens` (4096 and 8192) so reasoning does not cut answers off
+- Waits between tiers shortened to 15 to 25 seconds
+- Pages deploy split into validate, build and deploy jobs, and only `index.html` is published
+- README and docs rewritten
+
+---
+
 ## Phase 3, Portfolio Demo
 
 ### Added
