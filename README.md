@@ -4,7 +4,7 @@
 
 # CareerOS: Automated Job Intelligence System
 
-**End-to-end job search automation: AI analysis · CV tailoring · follow-up scheduling · Gmail classification · inbox auto-labeling · portfolio dashboard**
+**Job search automation: AI analysis · CV tailoring · follow-up scheduling · Gmail classification · inbox auto-labeling · portfolio dashboard**
 
 [![Demo](https://img.shields.io/badge/Live_Demo-odeliyach.github.io%2FCareerOS-B5C99A?style=flat-square&logo=github&logoColor=white)](https://odeliyach.github.io/CareerOS)
 [![n8n](https://img.shields.io/badge/n8n-Workflow_Automation-FFB5A7?style=flat-square&logo=n8n&logoColor=white)](https://n8n.io)
@@ -18,8 +18,7 @@
 
 A job search automation system I built with n8n. Paste a job description and it produces a tailored CV, cover letter, outreach emails, interview prep, and a follow-up schedule, then saves everything as Markdown files in a private GitHub repo.
 
-The live demo is a static dashboard with sample data. The Analyze button only works against a local n8n.
-
+The live demo is a static dashboard with sample data. It never contacts a server: Analyze plays a simulated result. Run it against a local n8n to trigger the real pipeline.
 ## Why I built it
 
 I was applying to a lot of roles and tracking them in spreadsheets. I wanted something that does the repetitive parts (reading the posting, tailoring the CV, reminding me to follow up) and keeps a full history I can read and diff. It is also a project to practice workflow design, LLM prompting, and working with API limits.
